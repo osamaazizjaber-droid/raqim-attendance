@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
       // 2. التحقق من جدول الأساتذة
       const { data, error: profError } = await supabase
         .from('professors')
-        .select('*')
+        .select('*, universities(name)')
         .eq('user_id', sessionUser.id)
         .maybeSingle();
 

@@ -88,6 +88,12 @@ export default function ProfessorReports() {
             stage_id,
             departments(name),
             stages(name)
+          ),
+          professors (
+            id,
+            name,
+            university_id,
+            universities(name)
           )
         `)
         .eq('professor_id', professor.id)
@@ -206,8 +212,8 @@ export default function ProfessorReports() {
 
   const exportSessionsData = sessions.map(s => ({
     date: new Date(s.started_at).toLocaleDateString('ar-EG'),
-    univ: professor?.universities?.name || 'جامعة رقيم',
-    prof: professor?.name || '-',
+    univ: s.professors?.universities?.name || '-',
+    prof: s.professors?.name || '-',
     course: s.courses?.name || '-',
     dept: s.courses?.departments?.name || '-',
     stage: s.courses?.stages?.name || '-',
