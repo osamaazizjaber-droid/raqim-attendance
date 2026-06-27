@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { ReportTable } from '../../components/reports/ReportTable';
 import { ExportButtons } from '../../components/reports/ExportButtons';
-import { ProfessorHeader } from './Dashboard';
+import { ProfessorSidebar } from './Dashboard';
 import { Eye, BookOpen, Calendar, Search } from 'lucide-react';
 import styles from '../../styles/professor.module.css';
 import compStyles from '../../styles/components.module.css';
@@ -225,7 +225,7 @@ export default function ProfessorReports() {
 
   return (
     <div className={styles.profLayout}>
-      <ProfessorHeader activePage="reports" />
+      <ProfessorSidebar activePage="reports" />
       
       <div className={styles.profContent}>
         <div className={styles.pageHeader}>

@@ -19,7 +19,7 @@ import logo from '../../assets/logo.png';
 import styles from '../../styles/professor.module.css';
 import compStyles from '../../styles/components.module.css';
 
-export function ProfessorHeader({ activePage }) {
+export function ProfessorSidebar({ activePage }) {
   const { professor, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -29,47 +29,54 @@ export function ProfessorHeader({ activePage }) {
   };
 
   return (
-    <header className={styles.profHeader}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+    <div className={styles.sidebar}>
+      <div className={styles.logoArea}>
         <img 
           src={logo} 
           alt="Raqim Logo" 
           style={{ 
-            width: '28px', 
-            height: '28px', 
+            width: '32px', 
+            height: '32px', 
             borderRadius: '50%', 
             border: '1px solid rgba(245, 158, 11, 0.3)' 
           }} 
         />
-        <span style={{ fontSize: '1.4rem', fontWeight: '900', color: 'var(--accent)' }}>رَقِيم</span>
-        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>|</span>
-        <span style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>أهلاً بك، {professor?.name}</span>
+        <span style={{ fontWeight: '900', color: 'var(--text-primary)', fontSize: '1.2rem' }}>رَقِيم — أستاذ</span>
       </div>
 
-      <nav className={styles.profNavbar}>
+      <div style={{ padding: '0 0.5rem 1.25rem 0.5rem', borderBottom: '1px solid var(--border)', marginBottom: '1rem' }}>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>مرحباً بك:</div>
+        <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '0.25rem' }}>{professor?.name}</div>
+      </div>
+
+      <nav className={styles.sidebarMenu}>
         <Link 
           to="/professor" 
-          className={`${styles.profNavLink} ${activePage === 'dashboard' ? styles.profNavLinkActive : ''}`}
+          className={`${styles.navLink} ${activePage === 'dashboard' ? styles.navLinkActive : ''}`}
         >
-          لوحة التحكم
+          <Play size={20} />
+          <span>لوحة التحكم</span>
         </Link>
         <Link 
           to="/professor/reports" 
-          className={`${styles.profNavLink} ${activePage === 'reports' ? styles.profNavLinkActive : ''}`}
+          className={`${styles.navLink} ${activePage === 'reports' ? styles.navLinkActive : ''}`}
         >
-          سجلات الحضور
+          <Calendar size={20} />
+          <span>سجلات الحضور</span>
         </Link>
-      </nav>
 
-      <button 
-        onClick={handleLogout}
-        className={`${compStyles.btn} ${compStyles.btnSecondary}`}
-        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
-      >
-        <LogOut size={16} />
-        <span>خروج</span>
-      </button>
-    </header>
+        <div className={styles.logoutBtn}>
+          <button 
+            onClick={handleLogout}
+            className={styles.navLink}
+            style={{ width: '100%', background: 'none', border: 'none', textAlign: 'right', display: 'flex', alignItems: 'center', gap: '0.75rem' }}
+          >
+            <LogOut size={20} />
+            <span>تسجيل الخروج</span>
+          </button>
+        </div>
+      </nav>
+    </div>
   );
 }
 
@@ -170,7 +177,7 @@ export default function ProfessorDashboard() {
 
   return (
     <div className={styles.profLayout}>
-      <ProfessorHeader activePage="dashboard" />
+      <ProfessorSidebar activePage="dashboard" />
       
       <div className={styles.profContent}>
         

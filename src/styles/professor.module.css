@@ -261,54 +261,70 @@
 
 /* 4. لوحة أستاذ عامة (Professor Workspace Layout) */
 .profLayout {
+  display: flex;
   min-height: 100vh;
   background-color: var(--bg-primary);
 }
 
-.profHeader {
+/* Sidebar */
+.sidebar {
+  width: 260px;
   background-color: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-  padding: 1rem 2rem;
+  border-left: 1px solid var(--border);
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+}
+
+.logoArea {
+  display: flex;
   align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.5rem;
 }
 
-.profNavbar {
+.sidebarMenu {
   display: flex;
-  gap: 1.5rem;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
 }
 
-.profNavLink {
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   font-weight: 600;
-  padding: 0.5rem 0;
-  position: relative;
-  transition: color var(--transition-fast);
+  transition: all var(--transition-fast);
+  cursor: pointer;
 }
 
-.profNavLink:hover {
+.navLink:hover {
+  background-color: var(--bg-tertiary);
   color: var(--text-primary);
 }
 
-.profNavLinkActive {
-  color: var(--accent);
+.navLinkActive {
+  background-color: var(--accent);
+  color: #ffffff !important;
 }
 
-.profNavLinkActive::after {
-  content: '';
-  position: absolute;
-  bottom: -1rem;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background-color: var(--accent);
+.logoutBtn {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
 }
 
 .profContent {
+  flex: 1;
   padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  overflow-y: auto;
+  max-height: 100vh;
 }
 
 .sessionCard {
@@ -359,26 +375,19 @@
 }
 
 @media (max-width: 768px) {
-  .profHeader {
+  .profLayout {
     flex-direction: column;
-    gap: 1rem;
-    padding: 1rem;
-    align-items: stretch;
-    text-align: center;
   }
   
-  .profNavbar {
-    justify-content: center;
-    gap: 1.25rem;
-    flex-wrap: wrap;
-  }
-  
-  .profNavLinkActive::after {
-    bottom: -0.5rem;
+  .sidebar {
+    width: 100%;
+    border-left: none;
+    border-bottom: 1px solid var(--border);
   }
   
   .profContent {
     padding: 1rem;
+    max-height: none;
   }
   
   .dashboardGrid {
