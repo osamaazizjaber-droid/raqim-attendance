@@ -118,10 +118,6 @@ export default function Login() {
             {loading ? 'جاري التحقق...' : 'تسجيل الدخول'}
           </Button>
         </form>
-
-        <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          محمي بواسطة سياسات الأمان وتشفير Supabase
-        </div>
       </div>
     </div>
   );
