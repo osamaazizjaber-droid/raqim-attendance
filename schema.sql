@@ -63,6 +63,7 @@ CREATE TABLE professors (
     email text NOT NULL UNIQUE,
     university_id uuid REFERENCES universities(id) ON DELETE SET NULL,
     subscription_expires_at date NOT NULL,
+    telegram_chat_id bigint, -- معرّف التيليجرام لإرسال التقارير التلقائية
     created_at timestamptz DEFAULT now()
 );
 

@@ -255,3 +255,159 @@ supabase
     }
   )
   .subscribe();
+
+/**
+ * وظيفة لتوليد وإرسال تقرير تفصيلي للأستاذ عبر تيليجرام فور انتهاء الجلسة.
+ */
+async function sendSessionReportToProfessor(session) {
+  try {
+    // 1. جلب بيانات الأستاذ للتحقق من ربط حسابه بالتيليجرام
+    const { data: professor, error: profErr } = await supabase
+      .from('professors')
+      .select('name, telegram_chat_id')
+      .eq('id', session.professor_id)
+      .single();
+
+    if (profErr) throw profErr;
+    if (!professor || !professor.telegram_chat_id) {
+      console.log(`ℹ️ الأستاذ ${session.professor_id} لم يقم بربط حسابه بالتليجرام بعد، تخطي إرسال التقرير.`);
+      return;
+    }
+
+    // 2. جلب بيانات المادة والقسم والمرحلة
+    const { data: course, error: courseErr } = await supabase
+      .from('courses')
+      .select('name, department_id, stage_id, departments(name), stages(name)')
+      .eq('id', session.course_id)
+      .single();
+
+    if (courseErr) throw courseErr;
+
+    // 3. جلب جميع طلاب القسم والمرحلة ونفس نوع الدراسة
+    const { data: allStudents, error: studErr } = await supabase
+      .from('students')
+      .select('id, full_name, student_number')
+      .eq('department_id', course.department_id)
+      .eq('stage_id', course.stage_id)
+      .eq('study_type', session.study_type || 'صباحي')
+      .order('full_name', { ascending: true });
+
+    if (studErr) throw studErr;
+
+    // 4. جلب سجلات الحاضرين في الجلسة
+    const { data: attendance, error: attErr } = await supabase
+      .from('attendance')
+      .select('student_id, scanned_at')
+      .eq('session_id', session.id);
+
+    if (attErr) throw attErr;
+
+    const presentMap = new Map(attendance?.map(a => [a.student_id, a.scanned_at]) || []);
+
+    let presentCount = 0;
+    let absentCount = 0;
+    let presentListText = '';
+    let absentListText = '';
+
+    (allStudents || []).forEach((student, index) => {
+      const scannedAt = presentMap.get(student.id);
+      if (scannedAt) {
+        presentCount++;
+        const timeStr = new Date(scannedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+        presentListText += `✅ ${presentCount}. ${student.full_name} (${student.student_number}) [${timeStr}]\n`;
+      } else {
+        absentCount++;
+        absentListText += `❌ ${absentCount}. ${student.full_name} (${student.student_number})\n`;
+      }
+    });
+
+    const totalEnrolled = (allStudents || []).length;
+    const attendanceRatio = totalEnrolled > 0 ? Math.round((presentCount / totalEnrolled) * 100) : 0;
+    const formattedDate = new Date(session.started_at).toLocaleDateString('ar-EG');
+    const startTimeStr = new Date(session.started_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    const endTimeStr = session.ended_at ? new Date(session.ended_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '-';
+
+    // التقرير الملخص وقائمة الغيابات
+    const summaryMessage = `
+📊 *تقرير حضور المحاضرة الرسمي — رقيم*
+
+• *الأستاذ:* د. ${professor.name}
+• *المادة:* ${course.name}
+• *القسم والكلية:* ${course.departments?.name || '-'}
+• *المرحلة:* ${course.stages?.name || '-'}
+• *نوع الدراسة:* ${session.study_type || 'صباحي'}
+• *التاريخ:* ${formattedDate}
+• *وقت البدء:* ${startTimeStr}
+• *وقت الانتهاء:* ${endTimeStr}
+
+📈 *إحصائيات الجلسة:*
+• الحاضرين: *${presentCount}* طلاب
+• الغائبين: *${absentCount}* طلاب
+• الإجمالي الكلي للشعبة: *${totalEnrolled}*
+• نسبة حضور الشعبة: *${attendanceRatio}%*
+
+------------------------------------------
+
+*🚫 قائمة الطلاب الغائبين (${absentCount}):*
+${absentListText || 'لا يوجد غيابات (الحضور مكتمل) 🎉'}
+`;
+
+    // إرسال الرسالة الأولى (الملخص والغائبين)
+    await bot.sendMessage(professor.telegram_chat_id, summaryMessage, { parse_mode: 'Markdown' });
+
+    // إرسال الرسالة الثانية (الحاضرين)
+    if (presentCount > 0) {
+      const presentMessageHeader = `*🟢 قائمة الطلاب الحاضرين (${presentCount}):*\n`;
+      let currentMsg = presentMessageHeader;
+      
+      const lines = presentListText.split('\n');
+      for (const line of lines) {
+        if ((currentMsg + line + '\n').length > 4000) {
+          await bot.sendMessage(professor.telegram_chat_id, currentMsg, { parse_mode: 'Markdown' });
+          currentMsg = '';
+        }
+        currentMsg += line + '\n';
+      }
+      
+      if (currentMsg.trim() !== '') {
+        await bot.sendMessage(professor.telegram_chat_id, currentMsg, { parse_mode: 'Markdown' });
+      }
+    } else {
+      await bot.sendMessage(professor.telegram_chat_id, '*🟢 قائمة الطلاب الحاضرين (0):*\nلا يوجد حضور في هذه الجلسة ❌', { parse_mode: 'Markdown' });
+    }
+
+    console.log(`✉️ تم إرسال تقرير الجلسة ${session.id} للأستاذ ${professor.name} عبر تيليجرام بنجاح.`);
+
+  } catch (err) {
+    console.error(`❌ فشل توليد وإرسال تقرير الجلسة ${session.id} للأستاذ:`, err);
+  }
+}
+
+// الاشتراك الفوري في تعديلات جدول الجلسات لإرسال التقارير عند الإغلاق
+supabase
+  .channel('sessions_update_queue')
+  .on(
+    'postgres_changes',
+    {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'sessions',
+    },
+    async (payload) => {
+      const newSession = payload.new;
+      
+      // نتحقق مما إذا كانت الجلسة مغلقة وأن تاريخ الإغلاق حديث جداً (خلال آخر 60 ثانية)
+      if (newSession.ended_at && !newSession.is_open) {
+        const endedTime = new Date(newSession.ended_at).getTime();
+        const nowTime = Date.now();
+        const diffMs = Math.abs(nowTime - endedTime);
+        
+        if (diffMs < 60000) { // 60 ثانية
+          console.log(`📊 جلسة الحضور أغلقت حديثاً: ${newSession.id}. جاري إرسال التقرير للأستاذ...`);
+          await sendSessionReportToProfessor(newSession);
+        }
+      }
+    }
+  )
+  .subscribe();
+
