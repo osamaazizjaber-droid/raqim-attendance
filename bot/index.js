@@ -1,5 +1,6 @@
 import TelegramBot from 'node-telegram-bot-api';
 import dotenv from 'dotenv';
+import http from 'http';
 import { supabase } from './supabase.js';
 import { handleStart, handleHelp, handleTextMessage } from './handlers.js';
 
@@ -410,4 +411,13 @@ supabase
     }
   )
   .subscribe();
+
+// خادم ويب بسيط لإبقاء خدمة Render مجانية قيد العمل (Web Service) دون الحاجة لبطاقة ائتمان
+const port = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end('🤖 بوت رقيم لتيليجرام يعمل بنجاح في الخلفية!');
+}).listen(port, () => {
+  console.log(`🌐 خادم ويب البوت يعمل على المنفذ ${port}`);
+});
 
