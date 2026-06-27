@@ -1,0 +1,390 @@
+/* =========================================================================
+   تنسيقات المكونات المشتركة - منصة رقيم (Common Components CSS Modules)
+   ========================================================================= */
+
+/* 1. الأزرار (Buttons) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  outline: none;
+}
+
+.btnPrimary {
+  background-color: var(--accent);
+  color: #ffffff;
+}
+.btnPrimary:hover {
+  background-color: var(--accent-hover);
+  transform: translateY(-1px);
+}
+.btnPrimary:active {
+  transform: translateY(0);
+}
+
+.btnSecondary {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+.btnSecondary:hover {
+  background-color: var(--border);
+  border-color: var(--text-muted);
+}
+
+.btnDanger {
+  background-color: var(--danger);
+  color: #ffffff;
+}
+.btnDanger:hover {
+  background-color: #dc2626;
+}
+
+.btnOutline {
+  background-color: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.btnOutline:hover {
+  background-color: var(--accent-light);
+}
+
+.btnIcon {
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+}
+
+.btnDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* 2. الجداول (Tables) */
+.tableContainer {
+  width: 100%;
+  overflow-x: auto;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 1.5rem;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: right;
+}
+
+.th {
+  background-color: rgba(17, 24, 39, 0.9);
+  color: var(--text-primary);
+  font-weight: 700;
+  padding: 1rem;
+  border-bottom: 2px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+.tr:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* 3. النوافذ المنبثقة (Modals) */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(3, 7, 18, 0.8);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeInOverlay var(--transition-normal);
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modalContent {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 500px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg), 0 0 20px rgba(59, 130, 246, 0.1);
+  animation: slideUpModal var(--transition-normal);
+}
+
+@keyframes slideUpModal {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modalTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+.modalClose:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.modalBody {
+  padding: 1.5rem;
+}
+
+.modalFooter {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+/* 4. الشارات (Badges) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 9999px;
+  text-transform: uppercase;
+}
+
+.badgeSuccess {
+  background-color: var(--success-light);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.badgeDanger {
+  background-color: var(--danger-light);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.badgeWarning {
+  background-color: var(--warning-light);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.badgeInfo {
+  background-color: var(--accent-light);
+  color: var(--accent);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+/* 5. رسائل التنبيه العائمة (Toasts) */
+.toastContainer {
+  position: fixed;
+  top: 1.5rem;
+  left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 2000;
+  max-width: 350px;
+  width: 90%;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border);
+  animation: slideInLeft var(--transition-normal);
+  background-color: var(--bg-secondary);
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.toastSuccess {
+  border-left: 4px solid var(--success);
+}
+.toastDanger {
+  border-left: 4px solid var(--danger);
+}
+.toastWarning {
+  border-left: 4px solid var(--warning);
+}
+.toastInfo {
+  border-left: 4px solid var(--accent);
+}
+
+.toastContent {
+  flex: 1;
+}
+
+.toastTitle {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 0.15rem;
+  color: var(--text-primary);
+}
+
+.toastMessage {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.toastClose {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.1rem;
+}
+.toastClose:hover {
+  color: var(--text-primary);
+}
+
+/* 6. هياكل التحميل (Skeletons) */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary) 25%,
+    var(--border) 50%,
+    var(--bg-tertiary) 75%
+  );
+  background-size: 200% 100%;
+  animation: loadingSkeleton 1.5s infinite;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+  width: 100%;
+  height: 1.25rem;
+}
+
+@keyframes loadingSkeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* 7. القوائم المنسدلة والمدخلات (Inputs & Fields) */
+.inputGroup {
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.input {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  transition: all var(--transition-fast);
+  outline: none;
+  text-align: right;
+  width: 100%;
+}
+
+.input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.select {
+  composes: input;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 0.75rem center;
+  background-size: 1.25rem;
+  padding-left: 2.5rem; /* مسافة للأيقونة على اليسار في RTL */
+}
+
+/* 8. حالة القائمة الفارغة (Empty State) */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 1.5rem;
+  background-color: var(--bg-secondary);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  gap: 1rem;
+}
+
+.emptyStateIcon {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.emptyStateTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.emptyStateText {
+  font-size: 0.9rem;
+  max-width: 400px;
+  margin: 0 auto;
+}
