@@ -195,6 +195,8 @@ export default function ProfessorReports() {
   // إعداد الأعمدة للتصدير
   const sessionHeaders = [
     { key: 'date', label: 'التاريخ' },
+    { key: 'univ', label: 'الجامعة' },
+    { key: 'prof', label: 'الأستاذ' },
     { key: 'course', label: 'المادة' },
     { key: 'dept', label: 'القسم' },
     { key: 'stage', label: 'المرحلة' },
@@ -204,6 +206,8 @@ export default function ProfessorReports() {
 
   const exportSessionsData = sessions.map(s => ({
     date: new Date(s.started_at).toLocaleDateString('ar-EG'),
+    univ: professor?.universities?.name || 'جامعة رقيم',
+    prof: professor?.name || '-',
     course: s.courses?.name || '-',
     dept: s.courses?.departments?.name || '-',
     stage: s.courses?.stages?.name || '-',
@@ -216,7 +220,7 @@ export default function ProfessorReports() {
     { key: 'student_number', label: 'الرقم الجامعي' },
     { key: 'study_type', label: 'الدراسة' },
     { key: 'is_present', label: 'حالة الحضور', render: (val) => val ? 'حاضر ✅' : 'غائب ❌' },
-    { key: 'scanned_at', label: 'وقت تسجيل الحضور' }
+    { key: 'scanned_at', label: 'توقيت المسح' }
   ];
 
   return (
@@ -339,7 +343,7 @@ export default function ProfessorReports() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
               <h4 style={{ fontWeight: 'bold' }}>أسماء طلاب المادة وحالة حضورهم</h4>
               <ExportButtons 
-                title={`حضور مادة: ${selectedSession.courses?.name} - التاريخ: ${new Date(selectedSession.started_at).toLocaleDateString('ar-EG')}`}
+                title={`كشف حضور مادة: ${selectedSession.courses?.name} - قسم: ${selectedSession.courses?.departments?.name} (${new Date(selectedSession.started_at).toLocaleDateString('ar-EG')})`}
                 headers={detailHeaders}
                 data={attendanceDetails}
                 fileName={`حضور_${selectedSession.courses?.name}`}
