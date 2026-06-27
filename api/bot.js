@@ -1,0 +1,395 @@
+import { createClient } from '@supabase/supabase-js';
+import TelegramBot from 'node-telegram-bot-api';
+
+const token = process.env.TELEGRAM_BOT_TOKEN;
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// التحقق من وجود المتغيرات
+if (!token || !supabaseUrl || !supabaseServiceKey) {
+  console.error('❌ Missing environment variables in serverless API');
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const bot = new TelegramBot(token, { polling: false });
+
+export default async function handler(req, res) {
+  // 1. معالجة طلب GET لتهيئة وإعداد الـ Webhook تلقائياً
+  if (req.method === 'GET') {
+    try {
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      const webhookUrl = `https://${host}/api/bot`;
+      
+      const response = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`);
+      const data = await response.json();
+      
+      return res.status(200).json({
+        message: 'تم إعداد وتفعيل الـ Webhook الخاص برقيم بنجاح!',
+        webhookUrl,
+        telegramResponse: data
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  // 2. معالجة طلبات POST الواردة من تيليجرام أو سوبابيس
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  try {
+    const body = req.body;
+    console.log('Received Webhook Payload:', JSON.stringify(body));
+
+    // أ) التحقق مما إذا كان الطلب قادماً من Supabase Database Webhook
+    if (body && body.table) {
+      const { table, type, record } = body;
+
+      if (table === 'telegram_resend_requests' && type === 'INSERT') {
+        await processResendRequest(record);
+      } else if (table === 'sessions' && type === 'UPDATE') {
+        // نتحقق مما إذا كانت الجلسة قد أُغلقت للتو
+        if (record.ended_at && !record.is_open) {
+          const endedTime = new Date(record.ended_at).getTime();
+          const diffMs = Math.abs(Date.now() - endedTime);
+          // إذا تم إغلاقها خلال آخر 2 دقيقة
+          if (diffMs < 120000) {
+            await sendSessionReportToProfessor(record);
+          }
+        }
+      }
+      return res.status(200).json({ success: true });
+    }
+
+    // ب) التحقق مما إذا كان الطلب تحديثاً مرسلاً من تيليجرام (Telegram Webhook Update)
+    if (body && body.message) {
+      const msg = body.message;
+      const chatId = msg.chat.id;
+      const text = msg.text ? msg.text.trim() : '';
+
+      if (text === '/start') {
+        await handleStart(chatId);
+      } else if (text === '/help') {
+        await handleHelp(chatId);
+      } else if (text !== '') {
+        await handleTextMessage(chatId, text);
+      }
+      return res.status(200).json({ success: true });
+    }
+
+    return res.status(200).json({ message: 'No action taken' });
+  } catch (err) {
+    console.error('Error in Vercel Telegram Webhook:', err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+async function handleStart(chatId) {
+  const welcomeText = `
+أهلاً بك في بوت منصة *رَقِيم* لتسجيل الحضور الجامعي الذكي! 🎓
+
+👤 *للطلاب:* يرجى إرسال **رقمك الجامعي** الآن (مثال: \`2023/CS/0142\`) للحصول على بطاقة الحضور وتفعيل حسابك.
+
+👨‍🏫 *للأساتذة:* يرجى إرسال **بريدك الإلكتروني** المسجل في المنصة لربط حسابك وتلقي تقارير حضور المحاضرات تلقائياً فور انتهائها.
+
+_ملاحظة: البوت يعمل بالكامل باللغة العربية._
+`;
+  await bot.sendMessage(chatId, welcomeText, { parse_mode: 'Markdown' });
+}
+
+async function handleHelp(chatId) {
+  const helpText = `
+💡 *تعليمات استخدام بوت رقيم:*
+
+👤 *للطلاب:*
+1. أرسل رقمك الجامعي لربط حسابك واستلام بطاقة الحضور الرسمية.
+2. احفظ صورة البطاقة في هاتفك لإظهارها للأستاذ عند تسجيل الحضور.
+
+👨‍🏫 *للأساتذة:*
+1. أرسل بريدك الإلكتروني المسجل بالمنصة لربط حساب التليجرام الخاص بك.
+2. ستتلقى تقرير حضور تفصيلي ومفصل (بالحاضرين والغائبين والنسب) تلقائياً فور إنهاء المحاضرة بالمنصة.
+`;
+  await bot.sendMessage(chatId, helpText, { parse_mode: 'Markdown' });
+}
+
+async function handleTextMessage(chatId, text) {
+  if (text.startsWith('/')) return;
+
+  // 0. التحقق مما إذا كان المدخل بريداً إلكترونياً (للأستاذ)
+  if (text.includes('@')) {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(text)) {
+      await bot.sendMessage(chatId, '⚠️ البريد الإلكتروني غير صالح. يرجى إدخال بريد إلكتروني صحيح.');
+      return;
+    }
+
+    const { data: professor, error: profErr } = await supabase
+      .from('professors')
+      .select('*')
+      .eq('email', text.toLowerCase())
+      .maybeSingle();
+
+    if (profErr) throw profErr;
+
+    if (!professor) {
+      await bot.sendMessage(chatId, '❌ هذا البريد الإلكتروني غير مسجل كأستاذ في منصة رقيم.');
+      return;
+    }
+
+    if (professor.telegram_chat_id && professor.telegram_chat_id !== chatId) {
+      await bot.sendMessage(chatId, '⚠️ هذا البريد مرتبط بحساب تيليجرام آخر بالفعل. يرجى مراجعة الإدارة لإعادة تعيينه.');
+      return;
+    }
+
+    const { error: updateErr } = await supabase
+      .from('professors')
+      .update({ telegram_chat_id: chatId })
+      .eq('id', professor.id);
+
+    if (updateErr) throw updateErr;
+
+    const successMsg = `
+✅ *أهلاً بك يا دكتور ${professor.name}!*
+تم تفعيل البوت وربطه بحسابك كأستاذ في منصة *رَقِيم* بنجاح.
+
+📧 *البريد الإلكتروني:* ${professor.email}
+🎓 *ستتلقى تقرير الحضور التفصيلي تلقائياً عبر تيليجرام فور انتهاء كل محاضرة تقوم بتسجيلها.*
+`;
+    await bot.sendMessage(chatId, successMsg, { parse_mode: 'Markdown' });
+    return;
+  }
+
+  // 1. ربط الطالب
+  const { data: linkedStudent, error: linkErr } = await supabase
+    .from('students')
+    .select('*, universities(name)')
+    .eq('telegram_chat_id', chatId)
+    .maybeSingle();
+
+  if (linkErr) throw linkErr;
+
+  let targetStudent = null;
+
+  if (linkedStudent) {
+    targetStudent = linkedStudent;
+  } else {
+    const { data: student, error: searchErr } = await supabase
+      .from('students')
+      .select('*, universities(name)')
+      .eq('student_number', text)
+      .maybeSingle();
+
+    if (searchErr) throw searchErr;
+
+    if (!student) {
+      await bot.sendMessage(chatId, '❌ الرقم الجامعي غير موجود بقاعدة البيانات، يرجى مراجعة إدارة التسجيل والقبول.');
+      return;
+    }
+
+    if (student.telegram_chat_id && student.telegram_chat_id !== chatId) {
+      await bot.sendMessage(chatId, '⚠️ هذا الرقم الجامعي مرتبط بحساب تيليجرام آخر بالفعل. يرجى مراجعة إدارة الكلية لإعادة تعيينه.');
+      return;
+    }
+
+    const { error: updateErr } = await supabase
+      .from('students')
+      .update({ telegram_chat_id: chatId })
+      .eq('id', student.id);
+
+    if (updateErr) throw updateErr;
+
+    student.telegram_chat_id = chatId;
+    targetStudent = student;
+  }
+
+  const isNewLink = !linkedStudent;
+  const caption = isNewLink 
+    ? `✅ *تم تفعيل البوت وربطه بحسابك بنجاح!*\n\n*الاسم:* ${targetStudent.full_name}\n*الرقم الجامعي:* ${targetStudent.student_number}\n*الجامعة:* ${targetStudent.universities?.name || 'جامعة رقيم'}\n\n_لقد تم قفل حسابك بالتيليجرام على هذا الرقم الجامعي. في المرات القادمة ستحصل على بطاقتك فوراً بمجرد إرسال أي رسالة للبوت._`
+    : `✅ *مرحباً بك مجدداً! إليك بطاقة الحضور الخاصة بك:*\n\n*الاسم:* ${targetStudent.full_name}\n*الرقم الجامعي:* ${targetStudent.student_number}\n*الجامعة:* ${targetStudent.universities?.name || 'جامعة رقيم'}`;
+
+  if (targetStudent.telegram_file_id) {
+    await bot.sendPhoto(chatId, targetStudent.telegram_file_id, {
+      caption: caption,
+      parse_mode: 'Markdown'
+    });
+  } else {
+    if (!targetStudent.qr_image_url) {
+      await bot.sendMessage(chatId, '⚠️ تم العثور على اسمك، ولكن لم يتم توليد بطاقة الـ QR الخاصة بك بعد. يرجى التواصل مع إدارة النظام لتوليدها.');
+      return;
+    }
+
+    const sentMsg = await bot.sendPhoto(chatId, targetStudent.qr_image_url, {
+      caption: caption,
+      parse_mode: 'Markdown'
+    });
+
+    const fileId = sentMsg.photo?.[sentMsg.photo.length - 1]?.file_id;
+    if (fileId) {
+      await supabase
+        .from('students')
+        .update({ telegram_file_id: fileId, qr_image_url: null })
+        .eq('id', targetStudent.id);
+
+      const path = `${targetStudent.university_id}/${targetStudent.id}.png`;
+      await supabase.storage.from('qr-cards').remove([path]);
+    }
+  }
+}
+
+async function processResendRequest(request) {
+  const { id: requestId, student_id: studentId } = request;
+  try {
+    await supabase.from('telegram_resend_requests').update({ status: 'processing' }).eq('id', requestId);
+    const { data: student, error: studErr } = await supabase
+      .from('students')
+      .select('*, universities(name)')
+      .eq('id', studentId)
+      .single();
+
+    if (studErr) throw studErr;
+    if (!student || !student.telegram_chat_id) return;
+
+    const caption = `
+📥 *إعادة إرسال بطاقة الحضور الرسمية:*
+
+*الاسم:* ${student.full_name}
+*الرقم الجامعي:* ${student.student_number}
+*الجامعة:* ${student.universities?.name || 'جامعة رقيم'}
+
+تم إرسال هذا الكارت بطلب من إدارة النظام.
+`;
+
+    if (student.telegram_file_id) {
+      await bot.sendPhoto(student.telegram_chat_id, student.telegram_file_id, {
+        caption: caption,
+        parse_mode: 'Markdown'
+      });
+    } else {
+      if (!student.qr_image_url) return;
+      const sentMsg = await bot.sendPhoto(student.telegram_chat_id, student.qr_image_url, {
+        caption: caption,
+        parse_mode: 'Markdown'
+      });
+
+      const fileId = sentMsg.photo?.[sentMsg.photo.length - 1]?.file_id;
+      if (fileId) {
+        await supabase.from('students').update({ telegram_file_id: fileId, qr_image_url: null }).eq('id', student.id);
+        const path = `${student.university_id}/${student.id}.png`;
+        await supabase.storage.from('qr-cards').remove([path]);
+      }
+    }
+    await supabase.from('telegram_resend_requests').update({ status: 'completed' }).eq('id', requestId);
+  } catch (err) {
+    console.error('Error processing resend request:', err);
+    await supabase.from('telegram_resend_requests').update({ status: 'failed', error_message: err.message }).eq('id', requestId);
+  }
+}
+
+async function sendSessionReportToProfessor(session) {
+  try {
+    const { data: professor, error: profErr } = await supabase
+      .from('professors')
+      .select('name, telegram_chat_id')
+      .eq('id', session.professor_id)
+      .single();
+
+    if (profErr) throw profErr;
+    if (!professor || !professor.telegram_chat_id) return;
+
+    const { data: course, error: courseErr } = await supabase
+      .from('courses')
+      .select('name, department_id, stage_id, departments(name), stages(name)')
+      .eq('id', session.course_id)
+      .single();
+
+    if (courseErr) throw courseErr;
+
+    const { data: allStudents, error: studErr } = await supabase
+      .from('students')
+      .select('id, full_name, student_number')
+      .eq('department_id', course.department_id)
+      .eq('stage_id', course.stage_id)
+      .eq('study_type', session.study_type || 'صباحي')
+      .order('full_name', { ascending: true });
+
+    if (studErr) throw studErr;
+
+    const { data: attendance, error: attErr } = await supabase
+      .from('attendance')
+      .select('student_id, scanned_at')
+      .eq('session_id', session.id);
+
+    if (attErr) throw attErr;
+
+    const presentMap = new Map(attendance?.map(a => [a.student_id, a.scanned_at]) || []);
+    let presentCount = 0;
+    let absentCount = 0;
+    let presentListText = '';
+    let absentListText = '';
+
+    (allStudents || []).forEach((student, index) => {
+      const scannedAt = presentMap.get(student.id);
+      if (scannedAt) {
+        presentCount++;
+        const timeStr = new Date(scannedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+        presentListText += `✅ ${presentCount}. ${student.full_name} (${student.student_number}) [${timeStr}]\n`;
+      } else {
+        absentCount++;
+        absentListText += `❌ ${absentCount}. ${student.full_name} (${student.student_number})\n`;
+      }
+    });
+
+    const totalEnrolled = (allStudents || []).length;
+    const attendanceRatio = totalEnrolled > 0 ? Math.round((presentCount / totalEnrolled) * 100) : 0;
+    const formattedDate = new Date(session.started_at).toLocaleDateString('ar-EG');
+    const startTimeStr = new Date(session.started_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    const endTimeStr = session.ended_at ? new Date(session.ended_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '-';
+
+    const summaryMessage = `
+📊 *تقرير حضور المحاضرة الرسمي — رقيم*
+
+• *الأستاذ:* د. ${professor.name}
+• *المادة:* ${course.name}
+• *القسم والكلية:* ${course.departments?.name || '-'}
+• *المرحلة:* ${course.stages?.name || '-'}
+• *نوع الدراسة:* ${session.study_type || 'صباحي'}
+• *التاريخ:* ${formattedDate}
+• *وقت البدء:* ${startTimeStr}
+• *وقت الانتهاء:* ${endTimeStr}
+
+📈 *إحصائيات الجلسة:*
+• الحاضرين: *${presentCount}* طلاب
+• الغائبين: *${absentCount}* طلاب
+• الإجمالي الكلي للشعبة: *${totalEnrolled}*
+• نسبة حضور الشعبة: *${attendanceRatio}%*
+
+------------------------------------------
+
+*🚫 قائمة الطلاب الغائبين (${absentCount}):*
+${absentListText || 'لا يوجد غيابات (الحضور مكتمل) 🎉'}
+`;
+
+    await bot.sendMessage(professor.telegram_chat_id, summaryMessage, { parse_mode: 'Markdown' });
+
+    if (presentCount > 0) {
+      const presentMessageHeader = `*🟢 قائمة الطلاب الحاضرين (${presentCount}):*\n`;
+      let currentMsg = presentMessageHeader;
+      const lines = presentListText.split('\n');
+      for (const line of lines) {
+        if ((currentMsg + line + '\n').length > 4000) {
+          await bot.sendMessage(professor.telegram_chat_id, currentMsg, { parse_mode: 'Markdown' });
+          currentMsg = '';
+        }
+        currentMsg += line + '\n';
+      }
+      if (currentMsg.trim() !== '') {
+        await bot.sendMessage(professor.telegram_chat_id, currentMsg, { parse_mode: 'Markdown' });
+      }
+    } else {
+      await bot.sendMessage(professor.telegram_chat_id, '*🟢 قائمة الطلاب الحاضرين (0):*\nلا يوجد حضور في هذه الجلسة ❌', { parse_mode: 'Markdown' });
+    }
+  } catch (err) {
+    console.error('Error sending session report:', err);
+  }
+}
