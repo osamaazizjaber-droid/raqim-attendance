@@ -331,6 +331,7 @@ export default function ProfessorReports() {
         isOpen={!!selectedSession}
         onClose={() => setSelectedSession(null)}
         title={selectedSession ? `كشف حضور مادة: ${selectedSession.courses?.name}` : ''}
+        size="lg"
       >
         {selectedSession && (
           <div>

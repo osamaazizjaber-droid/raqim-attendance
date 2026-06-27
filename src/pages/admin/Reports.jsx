@@ -371,6 +371,7 @@ export default function AdminReports() {
         isOpen={!!selectedSession}
         onClose={() => setSelectedSession(null)}
         title={selectedSession ? `تفاصيل حضور مادة: ${selectedSession.courses?.name}` : ''}
+        size="lg"
       >
         {selectedSession && (
           <div>
