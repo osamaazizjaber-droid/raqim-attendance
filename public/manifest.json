@@ -1,0 +1,18 @@
+{
+  "short_name": "Raqim",
+  "name": "رقيم — منصة تسجيل الحضور الجامعي الذكي",
+  "description": "منصة رقيم المتكاملة لتسجيل وإدارة حضور الطلاب الجامعي عبر كود QR والبطاقات الذكية.",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0a0e1a",
+  "theme_color": "#3b82f6",
+  "display": "standalone",
+  "orientation": "portrait"
+}
