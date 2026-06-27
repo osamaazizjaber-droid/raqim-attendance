@@ -336,19 +336,20 @@ export default function ProfessorReports() {
       <Modal
         isOpen={!!selectedSession}
         onClose={() => setSelectedSession(null)}
-        title={selectedSession ? `كشف حضور مادة: ${selectedSession.courses?.name}` : ''}
+        title={selectedSession ? `تفاصيل حضور مادة: ${selectedSession.courses?.name}` : ''}
         size="lg"
       >
         {selectedSession && (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.85rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>
-              <div><strong>تاريخ المحاضرة:</strong> {new Date(selectedSession.started_at).toLocaleString('ar-EG')}</div>
-              <div><strong>المرحلة والقسم:</strong> {selectedSession.courses?.departments?.name} | {selectedSession.courses?.stages?.name}</div>
-              <div><strong>نسبة الحضور:</strong> {selectedSession.present_count} حاضرين من أصل {selectedSession.enrolled_count} طالب</div>
+              <div><strong>الأستاذ:</strong> {selectedSession.professors?.name}</div>
+              <div><strong>التاريخ:</strong> {new Date(selectedSession.started_at).toLocaleString('ar-EG')}</div>
+              <div><strong>القسم:</strong> {selectedSession.courses?.departments?.name} | {selectedSession.courses?.stages?.name}</div>
+              <div><strong>حالة الحضور:</strong> {selectedSession.present_count} حاضرين من أصل {selectedSession.enrolled_count} طالب</div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-              <h4 style={{ fontWeight: 'bold' }}>أسماء طلاب المادة وحالة حضورهم</h4>
+              <h4 style={{ fontWeight: 'bold' }}>كشف أسماء الطلاب وحالة حضورهم</h4>
               <ExportButtons 
                 title={`كشف حضور مادة: ${selectedSession.courses?.name} - قسم: ${selectedSession.courses?.departments?.name} (${new Date(selectedSession.started_at).toLocaleDateString('ar-EG')})`}
                 headers={detailHeaders}
