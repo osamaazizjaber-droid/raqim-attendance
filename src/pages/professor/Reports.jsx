@@ -123,12 +123,13 @@ export default function ProfessorReports() {
           .select('id', { count: 'exact', head: true })
           .eq('session_id', sess.id);
 
-        // المسجلين
+        // المسجلين التابعين لنفس نوع الدراسة لتحديد النسبة بدقة
         const { count: enrolledCount } = await supabase
           .from('students')
           .select('id', { count: 'exact', head: true })
           .eq('department_id', sess.courses.department_id)
-          .eq('stage_id', sess.courses.stage_id);
+          .eq('stage_id', sess.courses.stage_id)
+          .eq('study_type', sess.study_type || 'صباحي');
 
         return {
           ...sess,
@@ -223,12 +224,12 @@ export default function ProfessorReports() {
       <ProfessorHeader activePage="reports" />
       
       <div className={styles.profContent}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-primary)' }}>سجلات الحضور للمحاضرات</h1>
+        <div className={styles.pageHeader}>
+          <h1 className={styles.pageTitle}>التقارير وسجلات الحضور الشاملة</h1>
         </div>
 
         {/* فلاتر الفحص والتنقيب */}
-        <div className={styles.sessionCard} style={{ cursor: 'default', display: 'flex', flexWrap: 'wrap', gap: '1rem', padding: '1.25rem', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+        <div className={styles.toolbar} style={{ backgroundColor: 'var(--bg-secondary)', padding: '1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
           <div className={compStyles.inputGroup} style={{ width: '220px', marginBottom: 0 }}>
             <label className={compStyles.label}>المادة الدراسية</label>
             <select

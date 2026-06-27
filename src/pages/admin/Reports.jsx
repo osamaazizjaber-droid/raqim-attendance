@@ -147,12 +147,13 @@ export default function AdminReports() {
           .select('id', { count: 'exact', head: true })
           .eq('session_id', session.id);
 
-        // 2. عدد الطلاب المسجلين أصلاً في هذا القسم والمرحلة
+        // 2. عدد الطلاب المسجلين أصلاً في هذا القسم والمرحلة ونفس نوع الدراسة
         const { count: enrolledCount } = await supabase
           .from('students')
           .select('id', { count: 'exact', head: true })
           .eq('department_id', session.courses.department_id)
-          .eq('stage_id', session.courses.stage_id);
+          .eq('stage_id', session.courses.stage_id)
+          .eq('study_type', session.study_type || 'صباحي');
 
         return {
           ...session,
