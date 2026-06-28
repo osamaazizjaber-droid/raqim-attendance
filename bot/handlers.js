@@ -5,7 +5,7 @@ export const handleStart = async (bot, msg) => {
   const welcomeText = `
 أهلاً بك في بوت منصة *رَقِيم* لتسجيل الحضور الجامعي الذكي! 🎓
 
-👤 *للطلاب:* يرجى إرسال **اسمك الرباعي الكامل** الآن (مثال: \`أحمد عبد الرحمن محمد علي\`) للحصول على بطاقة الحضور وتفعيل حسابك.
+👤 *للطلاب:* يرجى إرسال **اسمك الكامل (الثلاثي أو الرباعي)** الآن للحصول على بطاقة الحضور وتفعيل حسابك.
 
 👨‍🏫 *للأساتذة:* يرجى إرسال **بريدك الإلكتروني** المسجل في المنصة لربط حسابك وتلقي تقارير حضور المحاضرات تلقائياً فور انتهائها.
 
@@ -20,7 +20,7 @@ export const handleHelp = async (bot, msg) => {
 💡 *تعليمات استخدام بوت رقيم:*
 
 👤 *للطلاب:*
-1. أرسل اسمك الرباعي الكامل لربط حسابك واستلام بطاقة الحضور الرسمية.
+1. أرسل اسمك الكامل (الثلاثي أو الرباعي) لربط حسابك واستلام بطاقة الحضور الرسمية.
 2. احفظ صورة البطاقة في هاتفك لإظهارها للأستاذ عند تسجيل الحضور.
 
 👨‍🏫 *للأساتذة:*
@@ -103,19 +103,26 @@ export const handleTextMessage = async (bot, msg) => {
       // الحساب مرتبط مسبقاً بطالب، سنرسل له بطاقته هو دائماً بغض النظر عن النص الذي أرسله
       targetStudent = linkedStudent;
     } else {
-      // الحساب غير مرتبط بعد، سنبحث بالاسم الرباعي الكامل المرسل في النص
-      const { data: student, error: searchErr } = await supabase
+      // الحساب غير مرتبط بعد، سنبحث بالاسم (سواء كان ثلاثياً أو رباعياً) عبر المطابقة الجزئية
+      const { data: students, error: searchErr } = await supabase
         .from('students')
         .select('*, universities(name)')
-        .eq('full_name', text)
-        .maybeSingle();
+        .ilike('full_name', `${text}%`);
 
       if (searchErr) throw searchErr;
 
-      if (!student) {
-        await bot.sendMessage(chatId, '❌ الاسم الرباعي غير موجود بقاعدة البيانات. يرجى كتابة اسمك الرباعي الكامل بدقة كما هو مسجل، أو مراجعة إدارة التسجيل والقبول.');
+      if (!students || students.length === 0) {
+        await bot.sendMessage(chatId, '❌ الاسم غير موجود بقاعدة البيانات. يرجى كتابة اسمك بدقة كما هو مسجل بالمنصة، أو مراجعة إدارة التسجيل والقبول.');
         return;
       }
+
+      if (students.length > 1) {
+        const matchesList = students.slice(0, 3).map(s => `• ${s.full_name}`).join('\n');
+        await bot.sendMessage(chatId, `⚠️ تم العثور على أكثر من طالب يطابق هذا الاسم:\n${matchesList}\n\nيرجى كتابة اسمك الرباعي الكامل بدقة لتفعيل حسابك.`);
+        return;
+      }
+
+      const student = students[0];
 
       // فحص ما إذا كان هذا الاسم مرتبطاً بحساب تيليجرام آخر بالفعل لمنع سرقة الهويات
       if (student.telegram_chat_id && student.telegram_chat_id !== chatId) {
