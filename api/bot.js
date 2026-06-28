@@ -44,19 +44,15 @@ export default async function handler(req, res) {
 
     // أ) التحقق مما إذا كان الطلب قادماً من Supabase Database Webhook
     if (body && body.table) {
-      const { table, type, record } = body;
+      const { table, type, record, old_record } = body;
 
       if (table === 'telegram_resend_requests' && type === 'INSERT') {
         await processResendRequest(record);
       } else if (table === 'sessions' && type === 'UPDATE') {
-        // نتحقق مما إذا كانت الجلسة قد أُغلقت للتو
-        if (record.ended_at && !record.is_open) {
-          const endedTime = new Date(record.ended_at).getTime();
-          const diffMs = Math.abs(Date.now() - endedTime);
-          // إذا تم إغلاقها خلال آخر 2 دقيقة
-          if (diffMs < 120000) {
-            await sendSessionReportToProfessor(record);
-          }
+        // نتحقق مما إذا كانت الجلسة قد أُغلقت للتو (تحول حقل is_open من true إلى false)
+        const justClosed = old_record && old_record.is_open === true && record.is_open === false;
+        if (justClosed) {
+          await sendSessionReportToProfessor(record);
         }
       }
       return res.status(200).json({ success: true });
