@@ -406,3 +406,4 @@ CREATE POLICY "Admins can manage creation requests" ON public.professor_creation
 ALTER PUBLICATION supabase_realtime ADD TABLE attendance;
 ALTER PUBLICATION supabase_realtime ADD TABLE telegram_resend_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE professor_creation_requests;
+ALTER PUBLICATION supabase_realtime ADD TABLE sessions;
