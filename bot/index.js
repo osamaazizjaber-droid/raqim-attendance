@@ -395,6 +395,7 @@ supabase
       table: 'sessions',
     },
     async (payload) => {
+      console.log('🔔 Received UPDATE on sessions:', payload);
       const newSession = payload.new;
       const oldSession = payload.old;
       
