@@ -396,17 +396,26 @@ supabase
     },
     async (payload) => {
       const newSession = payload.new;
+      const oldSession = payload.old;
       
-      // نتحقق مما إذا كانت الجلسة مغلقة وأن تاريخ الإغلاق حديث جداً (خلال آخر 60 ثانية)
+      // نتحقق مما إذا كانت الجلسة قد أغلقت للتو
+      let justClosed = false;
       if (newSession.ended_at && !newSession.is_open) {
-        const endedTime = new Date(newSession.ended_at).getTime();
-        const nowTime = Date.now();
-        const diffMs = Math.abs(nowTime - endedTime);
-        
-        if (diffMs < 60000) { // 60 ثانية
-          console.log(`📊 جلسة الحضور أغلقت حديثاً: ${newSession.id}. جاري إرسال التقرير للأستاذ...`);
-          await sendSessionReportToProfessor(newSession);
+        if (oldSession && typeof oldSession.is_open === 'boolean') {
+          // إذا كان السجل القديم يحتوي على حالة الجلسة، نتحقق من الانتقال الفعلي من مفتوح لمغلق
+          justClosed = oldSession.is_open === true && newSession.is_open === false;
+        } else {
+          // Fallback: نقارن وقت الإغلاق بوقت الخادم الحالي مع إعطاء سماحية أكبر (5 دقائق) لتفادي فروق التوقيت
+          const endedTime = new Date(newSession.ended_at).getTime();
+          const nowTime = Date.now();
+          const diffMs = Math.abs(nowTime - endedTime);
+          justClosed = diffMs < 300000; // 5 دقائق (300000 مللي ثانية)
         }
+      }
+
+      if (justClosed) {
+        console.log(`📊 جلسة الحضور أغلقت حديثاً: ${newSession.id}. جاري إرسال التقرير للأستاذ...`);
+        await sendSessionReportToProfessor(newSession);
       }
     }
   )

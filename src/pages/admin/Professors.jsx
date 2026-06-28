@@ -296,6 +296,27 @@ export default function AdminProfessors() {
     }
   };
 
+  // إلغاء ربط تيليجرام للأستاذ
+  const handleUnlinkTelegram = async () => {
+    if (!selectedProf) return;
+    if (!window.confirm(`هل أنت متأكد من إلغاء ربط حساب التيليجرام للأستاذ "${selectedProf.name}"؟`)) return;
+    try {
+      const { error } = await supabase
+        .from('professors')
+        .update({ telegram_chat_id: null })
+        .eq('id', selectedProf.id);
+
+      if (error) throw error;
+
+      // تحديث الحالة المحلية
+      setProfessors(prev => prev.map(p => p.id === selectedProf.id ? { ...p, telegram_chat_id: null } : p));
+      setSelectedProf(prev => ({ ...prev, telegram_chat_id: null }));
+      showToast('نجاح', 'تم إلغاء ربط حساب التيليجرام للأستاذ بنجاح', 'success');
+    } catch (err) {
+      showToast('خطأ', 'فشل إلغاء ربط التيليجرام للأستاذ', 'danger');
+    }
+  };
+
   // Helper to format subscription state
   const getSubscriptionBadge = (dateStr) => {
     const expiry = new Date(dateStr);
@@ -398,6 +419,25 @@ export default function AdminProfessors() {
                       >
                         تعديل / تجديد
                       </button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+                      <span>
+                        <strong>حساب تيليجرام:</strong>{' '}
+                        {selectedProf.telegram_chat_id ? (
+                          <Badge variant="success">مرتبط ✅</Badge>
+                        ) : (
+                          <Badge variant="danger">غير مرتبط ❌</Badge>
+                        )}
+                      </span>
+                      {selectedProf.telegram_chat_id && (
+                        <button
+                          onClick={handleUnlinkTelegram}
+                          className={`${compStyles.btn} ${compStyles.btnOutline}`}
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                        >
+                          إلغاء الربط
+                        </button>
+                      )}
                     </div>
                   </div>
 
