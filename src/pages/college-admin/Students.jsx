@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Table, Tr, Th, Td } from '../../components/ui/Table';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { Badge } from '../../components/ui/Badge';
 import { generateAndUploadQRCard } from '../../lib/qrGenerator';
 import { CollegeAdminSidebar } from './Dashboard';
 import styles from '../../styles/admin.module.css';
