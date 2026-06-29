@@ -158,7 +158,7 @@ export default function CollegeAdminResults() {
 
       const { data: allCourses } = await supabase
         .from('courses')
-        .select('id, name, department_id, departments(college_id)')
+        .select('id, name, department_id, departments!inner(college_id)')
         .eq('departments.college_id', adminDetails.college_id);
 
       const studentsMap = new Map(allStudents.map(s => [s.student_number.trim(), s.id]));
@@ -167,12 +167,40 @@ export default function CollegeAdminResults() {
       const resultsToInsert = [];
 
       resultsPreview.forEach((row, idx) => {
-        const studNum = String(row.student_number || '').trim();
-        const courseName = String(row.course_name || '').trim().toLowerCase();
+        // دعم المسميات الإنجليزية والعربية للأعمدة لتسهيل الاستيراد على المسؤول
+        const studNum = String(
+          row.student_number || 
+          row['الرقم الجامعي'] || 
+          row['الرقم'] || 
+          ''
+        ).trim();
+
+        const courseName = String(
+          row.course_name || 
+          row['اسم المادة'] || 
+          row['المادة'] || 
+          row['اسم المقرر'] || 
+          row['المقرر'] || 
+          ''
+        ).trim().toLowerCase();
         
-        let score = parseFloat(row.score);
-        let gradeLabel = String(row.grade_label || row['التقدير'] || row['grade'] || '').trim();
-        const year = String(row.academic_year || selectedYear).trim();
+        let score = parseFloat(row.score || row['الدرجة'] || row['درجة'] || row['العلامة']);
+        let gradeLabel = String(
+          row.grade_label || 
+          row['التقدير'] || 
+          row['التقدير العام'] || 
+          row['تقدير'] || 
+          row['grade'] || 
+          ''
+        ).trim();
+
+        const year = String(
+          row.academic_year || 
+          row['السنة الدراسية'] || 
+          row['العام الدراسي'] || 
+          row['السنة'] || 
+          selectedYear
+        ).trim();
 
         const studentId = studentsMap.get(studNum);
         const courseId = coursesMap.get(courseName);
