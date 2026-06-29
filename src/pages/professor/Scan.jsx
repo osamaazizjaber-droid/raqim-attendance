@@ -20,6 +20,7 @@ export default function ProfessorScan() {
   // States
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [repeatStudentsSet, setRepeatStudentsSet] = useState(new Set());
   
   // Realtime attendance hook
   const { presentStudents } = useRealtime(sessionId);
@@ -46,6 +47,17 @@ export default function ProfessorScan() {
 
       if (!data.is_open) {
         showToast('جلسة مغلقة ⚠️', 'هذه الجلسة مغلقة بالفعل ولا يمكن تسجيل الحضور بها.', 'warning');
+      }
+
+      // جلب درجات أو مواد الإعادة للمساق لمعرفة الطلاب المعيدين في الجلسة الحالية
+      const { data: scData, error: scErr } = await supabase
+        .from('student_courses')
+        .select('student_id')
+        .eq('course_id', data.course_id)
+        .eq('type', 'repeat');
+      
+      if (!scErr && scData) {
+        setRepeatStudentsSet(new Set(scData.map(d => d.student_id)));
       }
     } catch (err) {
       showToast('خطأ', 'فشل تحميل تفاصيل جلسة الحضور', 'danger');
@@ -165,7 +177,12 @@ export default function ProfessorScan() {
         {showSuccessOverlay && scannedStudent && (
           <div className={styles.scanOverlay}>
             <div style={{ fontSize: '5rem', marginBottom: '1rem', animation: 'zoomIn 0.3s' }}>✅</div>
-            <div className={styles.scanOverlayName}>{scannedStudent.full_name}</div>
+            <div className={styles.scanOverlayName} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              <span>{scannedStudent.full_name}</span>
+              {repeatStudentsSet.has(scannedStudent.id) && (
+                <span style={{ fontSize: '0.8rem', backgroundColor: 'var(--danger)', color: '#ffffff', padding: '0.1rem 0.5rem', borderRadius: '12px' }}>إعادة</span>
+              )}
+            </div>
             <div className={styles.scanOverlayNum}>{scannedStudent.student_number}</div>
             <div style={{ fontSize: '1rem', marginTop: '1rem', opacity: 0.9, fontWeight: 'bold' }}>تم تسجيل الحضور بنجاح</div>
           </div>
@@ -188,7 +205,12 @@ export default function ProfessorScan() {
                   {student.full_name.slice(0, 1)}
                 </div>
                 <div>
-                  <div className={styles.studentName}>{student.full_name}</div>
+                  <div className={styles.studentName} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span>{student.full_name}</span>
+                    {repeatStudentsSet.has(student.id) && (
+                      <span style={{ fontSize: '0.7rem', backgroundColor: 'var(--danger-light)', color: 'var(--danger)', padding: '1px 6px', borderRadius: '10px', fontWeight: 'bold' }}>إعادة</span>
+                    )}
+                  </div>
                   <div className={styles.studentNum}>{student.student_number}</div>
                 </div>
               </div>

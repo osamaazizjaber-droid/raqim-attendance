@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext({
   user: null,
-  isAdmin: false,
+  role: null, // 'super-admin' | 'university-admin' | 'college-admin' | 'professor'
+  adminDetails: null,
   professor: null,
   loading: true,
   error: null,
@@ -13,7 +14,8 @@ const AuthContext = createContext({
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState(null);
+  const [adminDetails, setAdminDetails] = useState(null);
   const [professor, setProfessor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,7 +23,8 @@ export const AuthProvider = ({ children }) => {
   const checkUserRole = async (sessionUser) => {
     if (!sessionUser) {
       setUser(null);
-      setIsAdmin(false);
+      setRole(null);
+      setAdminDetails(null);
       setProfessor(null);
       setLoading(false);
       return;
@@ -34,37 +37,58 @@ export const AuthProvider = ({ children }) => {
       // 1. التحقق مما إذا كان البريد هو البريد الخاص بالمدير العام
       if (sessionUser.email === superAdminEmail) {
         setUser(sessionUser);
-        setIsAdmin(true);
+        setRole('super-admin');
+        setAdminDetails({ role: 'super-admin', name: 'المشرف العام' });
         setProfessor(null);
         setLoading(false);
         return;
       }
 
-      // 2. التحقق من جدول الأساتذة
-      const { data, error: profError } = await supabase
-        .from('professors')
-        .select('*, universities(name)')
+      // 2. التحقق من جدول المدراء (جامعة أو كلية)
+      const { data: admin, error: adminErr } = await supabase
+        .from('admins')
+        .select('*, universities(name, subscription_expires_at)')
         .eq('user_id', sessionUser.id)
         .maybeSingle();
 
-      if (profError) {
-        throw profError;
+      if (adminErr) throw adminErr;
+
+      if (admin) {
+        setUser(sessionUser);
+        setRole(admin.role === 'university' ? 'university-admin' : 'college-admin');
+        setAdminDetails(admin);
+        setProfessor(null);
+        setLoading(false);
+        return;
       }
 
-      if (data) {
+      // 3. التحقق من جدول الأساتذة
+      const { data: prof, error: profErr } = await supabase
+        .from('professors')
+        .select('*, universities(name, subscription_expires_at)')
+        .eq('user_id', sessionUser.id)
+        .maybeSingle();
+
+      if (profErr) throw profErr;
+
+      if (prof) {
         setUser(sessionUser);
-        setIsAdmin(false);
-        setProfessor(data);
-      } else {
-        // مستخدم مسجل ولكن ليس له سجل أستاذ وليس أدمن
-        await supabase.auth.signOut();
-        throw new Error('غير مصرح لك بالوصول، البريد غير مسجل كأستاذ.');
+        setRole('professor');
+        setProfessor(prof);
+        setAdminDetails(null);
+        setLoading(false);
+        return;
       }
+
+      // مستخدم مسجل ولكن ليس له سجل أستاذ أو أدمن
+      await supabase.auth.signOut();
+      throw new Error('غير مصرح لك بالوصول، الحساب غير مسجل بالمنصة.');
     } catch (err) {
       console.error('Error checking user role:', err);
       setError(err.message || 'حدث خطأ أثناء تحديد دور المستخدم');
       setUser(null);
-      setIsAdmin(false);
+      setRole(null);
+      setAdminDetails(null);
       setProfessor(null);
     } finally {
       setLoading(false);
@@ -88,7 +112,8 @@ export const AuthProvider = ({ children }) => {
           await checkUserRole(session.user);
         } else {
           setUser(null);
-          setIsAdmin(false);
+          setRole(null);
+          setAdminDetails(null);
           setProfessor(null);
           setLoading(false);
         }
@@ -123,13 +148,14 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     await supabase.auth.signOut();
     setUser(null);
-    setIsAdmin(false);
+    setRole(null);
+    setAdminDetails(null);
     setProfessor(null);
     setLoading(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, professor, loading, error, login, logout }}>
+    <AuthContext.Provider value={{ user, role, adminDetails, professor, loading, error, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

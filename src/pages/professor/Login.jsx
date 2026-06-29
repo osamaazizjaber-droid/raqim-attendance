@@ -9,13 +9,35 @@ import compStyles from '../../styles/components.module.css';
 import logo from '../../assets/logo.png';
 
 export default function Login() {
-  const { login, error } = useAuth();
+  const { login, error, user, role, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState(null);
+
+  // إعادة التوجيه التلقائي للمستخدم بناءً على دوره فور توفر البيانات
+  useEffect(() => {
+    if (!authLoading && user && role) {
+      switch (role) {
+        case 'super-admin':
+          navigate('/super-admin/dashboard', { replace: true });
+          break;
+        case 'university-admin':
+          navigate('/university-admin/dashboard', { replace: true });
+          break;
+        case 'college-admin':
+          navigate('/college-admin/dashboard', { replace: true });
+          break;
+        case 'professor':
+          navigate('/professor', { replace: true });
+          break;
+        default:
+          break;
+      }
+    }
+  }, [user, role, authLoading, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,18 +46,9 @@ export default function Login() {
 
     try {
       await login(email, password);
-      // بعد تسجيل الدخول بنجاح، سيقوم مسمتع الحالة التلقائي بتحديث السياق والتوجيه سيحدث عبر Route Guard.
-      // ولكن كحماية إضافية، يمكننا التوجيه يدوياً بناءً على الحساب
-      const superAdminEmail = import.meta.env.VITE_SUPER_ADMIN_EMAIL;
-      if (email === superAdminEmail) {
-        navigate('/admin');
-      } else {
-        // سيتم التحقق من الاشتراك تلقائياً في لوحة تحكم الأستاذ وتوجيهه لشاشة الحظر إن كان منتهياً
-        navigate('/professor');
-      }
+      // سيتم التوجيه تلقائياً عبر الـ useEffect بمجرد تحديث دور المستخدم في السياق.
     } catch (err) {
       setLocalError(err.message || 'حدث خطأ غير متوقع');
-    } finally {
       setLoading(false);
     }
   };

@@ -31,7 +31,7 @@ bot.onText(/\/help/, (msg) => handleHelp(bot, msg));
 bot.on('message', (msg) => handleTextMessage(bot, msg));
 
 /**
- * وظيفة لمعالجة طلب إرسال كود QR وإرساله للطالب وتحديث قاعدة البيانات.
+ * وظيفة لمعالجة طلب إعادة إرسال كود QR وتحديث قاعدة البيانات.
  */
 async function processResendRequest(request) {
   const { id: requestId, student_id: studentId } = request;
@@ -147,17 +147,17 @@ async function processOldPendingRequests() {
   }
 }
 
-// تشغيل فحص المعلقات لإعادة إرسال البطاقات
+// تشغيل فحص معلقات إعادة إرسال البطاقات
 processOldPendingRequests();
 
-// --- طابور معالجة طلبات إنشاء الأساتذة ---
+// --- طابور معالجة طلبات إنشاء المستخدمين (المدراء والأساتذة) ---
 
-async function processProfessorRequest(request) {
-  console.log(`👤 البدء في معالجة طلب إنشاء الأستاذ: ${request.email}`);
+async function processUserCreationRequest(request) {
+  console.log(`👤 البدء في معالجة طلب إنشاء حساب: ${request.email} بدور: ${request.role}`);
   try {
     // 1. تحديث الحالة إلى جاري المعالجة
     await supabase
-      .from('professor_creation_requests')
+      .from('user_creation_requests')
       .update({ status: 'processing' })
       .eq('id', request.id);
 
@@ -171,32 +171,46 @@ async function processProfessorRequest(request) {
 
     if (createError) throw createError;
 
-    // 3. إدخال الأستاذ في جدول professors
-    const { error: profError } = await supabase.from('professors').insert({
-      user_id: user.id,
-      name: request.name,
-      email: request.email,
-      university_id: request.university_id,
-      subscription_expires_at: request.subscription_expires_at
-    });
-
-    if (profError) {
-      // تراجع عن إنشاء الحساب في حال فشل الإدخال في جدول الأساتذة لضمان الاتساق
-      await supabase.auth.admin.deleteUser(user.id);
-      throw profError;
+    // 3. إدخال السجل في الجدول المناسب بناءً على الدور
+    if (request.role === 'university' || request.role === 'college') {
+      const { error: adminError } = await supabase.from('admins').insert({
+        user_id: user.id,
+        name: request.name,
+        email: request.email,
+        role: request.role,
+        university_id: request.university_id,
+        college_id: request.college_id
+      });
+      if (adminError) {
+        await supabase.auth.admin.deleteUser(user.id);
+        throw adminError;
+      }
+    } else if (request.role === 'professor') {
+      const { error: profError } = await supabase.from('professors').insert({
+        user_id: user.id,
+        name: request.name,
+        email: request.email,
+        university_id: request.university_id,
+        college_id: request.college_id,
+        subscription_expires_at: request.subscription_expires_at
+      });
+      if (profError) {
+        await supabase.auth.admin.deleteUser(user.id);
+        throw profError;
+      }
     }
 
     // 4. تحديث الحالة إلى مكتمل
     await supabase
-      .from('professor_creation_requests')
+      .from('user_creation_requests')
       .update({ status: 'completed' })
       .eq('id', request.id);
 
-    console.log(`✅ تم إنشاء حساب الأستاذ ${request.email} بنجاح.`);
+    console.log(`✅ تم إنشاء حساب ${request.email} بنجاح.`);
   } catch (err) {
-    console.error(`❌ فشل إنشاء حساب الأستاذ ${request.email}:`, err);
+    console.error(`❌ فشل إنشاء حساب ${request.email}:`, err);
     await supabase
-      .from('professor_creation_requests')
+      .from('user_creation_requests')
       .update({ 
         status: 'failed', 
         error_message: err.message || 'حدث خطأ غير معروف' 
@@ -205,28 +219,45 @@ async function processProfessorRequest(request) {
   }
 }
 
-async function processOldProfessorRequests() {
+async function processOldUserCreationRequests() {
   try {
     const { data: pendingRequests, error } = await supabase
-      .from('professor_creation_requests')
+      .from('user_creation_requests')
       .select('*')
       .eq('status', 'pending');
 
     if (error) throw error;
 
     if (pendingRequests && pendingRequests.length > 0) {
-      console.log(`⚙️ وجدنا (${pendingRequests.length}) طلبات إنشاء أساتذة معلقة من قبل. جاري معالجتها الآن...`);
+      console.log(`⚙️ وجدنا (${pendingRequests.length}) طلبات إنشاء حسابات معلقة من قبل. جاري معالجتها الآن...`);
       for (const req of pendingRequests) {
-        await processProfessorRequest(req);
+        await processUserCreationRequest(req);
       }
     }
   } catch (err) {
-    console.error('Error processing old professor requests:', err);
+    console.error('Error processing old user creation requests:', err);
   }
 }
 
-// تشغيل فحص معلقات الأساتذة عند إقلاع البوت
-processOldProfessorRequests();
+// تشغيل فحص معلقات الحسابات عند إقلاع البوت
+processOldUserCreationRequests();
+
+// الاشتراك الفوري في الإضافات لجدول user_creation_requests لإنشاء الحسابات
+supabase
+  .channel('user_creation_queue')
+  .on(
+    'postgres_changes',
+    {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'user_creation_requests',
+    },
+    async (payload) => {
+      console.log('🔔 استقبلنا طلب إنشاء مستخدم جديد عبر Realtime:', payload.new.email);
+      await processUserCreationRequest(payload.new);
+    }
+  )
+  .subscribe();
 
 // الاشتراك الفوري في الإضافات الجديدة لجدول telegram_resend_requests
 supabase
@@ -241,23 +272,6 @@ supabase
     async (payload) => {
       console.log('🔔 استقبلنا طلب إعادة إرسال كرت جديد عبر Realtime:', payload.new.id);
       await processResendRequest(payload.new);
-    }
-  )
-  .subscribe();
-
-// الاشتراك الفوري في الإضافات لجدول professor_creation_requests لإنشاء الحسابات
-supabase
-  .channel('professor_creation_queue')
-  .on(
-    'postgres_changes',
-    {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'professor_creation_requests',
-    },
-    async (payload) => {
-      console.log('🔔 استقبلنا طلب إنشاء أستاذ جديد عبر Realtime:', payload.new.email);
-      await processProfessorRequest(payload.new);
     }
   )
   .subscribe();
@@ -283,21 +297,43 @@ async function sendSessionReportToProfessor(session) {
     // 2. جلب بيانات المادة والقسم والمرحلة
     const { data: course, error: courseErr } = await supabase
       .from('courses')
-      .select('name, department_id, stage_id, departments(name), stages(name)')
+      .select('name, department_id, stage_id, departments(name, college_id), stages(name)')
       .eq('id', session.course_id)
       .single();
 
     if (courseErr) throw courseErr;
 
-    // 3. جلب جميع طلاب القسم والمرحلة ونفس نوع الدراسة
-    const { data: allStudents, error: studErr } = await supabase
-      .from('students')
-      .select('id, full_name, student_number')
-      .eq('department_id', course.department_id)
-      .eq('stage_id', course.stage_id)
-      .eq('study_type', session.study_type || 'صباحي')
-      .order('full_name', { ascending: true });
+    // حساب العام الدراسي الحالي
+    const now = new Date();
+    const currentYear = now.getMonth() >= 8 
+      ? `${now.getFullYear()}/${now.getFullYear() + 1}` 
+      : `${now.getFullYear() - 1}/${now.getFullYear()}`;
 
+    // جلب الطلاب المعيدين في المادة من جدول student_courses
+    const { data: studentCoursesData, error: scErr } = await supabase
+      .from('student_courses')
+      .select('student_id, type')
+      .eq('course_id', session.course_id)
+      .eq('academic_year', currentYear);
+
+    if (scErr) throw scErr;
+
+    const repeatStudentIds = (studentCoursesData || []).filter(sc => sc.type === 'repeat').map(sc => sc.student_id);
+
+    // 3. جلب جميع الطلاب (المنتظمين بالقسم والمرحلة + المعيدين في هذه المادة)
+    let query = supabase
+      .from('students')
+      .select('id, full_name, student_number');
+
+    if (repeatStudentIds.length > 0) {
+      query = query.or(`and(department_id.eq.${course.department_id},stage_id.eq.${course.stage_id},study_type.eq.${session.study_type || 'صباحي'}),id.in.(${repeatStudentIds.join(',')})`);
+    } else {
+      query = query.eq('department_id', course.department_id)
+        .eq('stage_id', course.stage_id)
+        .eq('study_type', session.study_type || 'صباحي');
+    }
+
+    const { data: allStudents, error: studErr } = await query.order('full_name', { ascending: true });
     if (studErr) throw studErr;
 
     // 4. جلب سجلات الحاضرين في الجلسة
@@ -309,21 +345,24 @@ async function sendSessionReportToProfessor(session) {
     if (attErr) throw attErr;
 
     const presentMap = new Map(attendance?.map(a => [a.student_id, a.scanned_at]) || []);
+    const repeatSet = new Set(repeatStudentIds);
 
     let presentCount = 0;
     let absentCount = 0;
     let presentListText = '';
     let absentListText = '';
 
-    (allStudents || []).forEach((student, index) => {
+    (allStudents || []).forEach((student) => {
       const scannedAt = presentMap.get(student.id);
+      const suffix = repeatSet.has(student.id) ? ' (إعادة)' : '';
+
       if (scannedAt) {
         presentCount++;
         const timeStr = new Date(scannedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-        presentListText += `✅ ${presentCount}. ${student.full_name} (${student.student_number}) [${timeStr}]\n`;
+        presentListText += `✅ ${presentCount}. ${student.full_name}${suffix} (${student.student_number}) [${timeStr}]\n`;
       } else {
         absentCount++;
-        absentListText += `❌ ${absentCount}. ${student.full_name} (${student.student_number})\n`;
+        absentListText += `❌ ${absentCount}. ${student.full_name}${suffix} (${student.student_number})\n`;
       }
     });
 
@@ -339,7 +378,7 @@ async function sendSessionReportToProfessor(session) {
 
 • *الأستاذ:* د. ${professor.name}
 • *المادة:* ${course.name}
-• *القسم والكلية:* ${course.departments?.name || '-'}
+• *القسم:* ${course.departments?.name || '-'}
 • *المرحلة:* ${course.stages?.name || '-'}
 • *نوع الدراسة:* ${session.study_type || 'صباحي'}
 • *التاريخ:* ${formattedDate}
@@ -389,7 +428,7 @@ ${absentListText || 'لا يوجد غيابات (الحضور مكتمل) 🎉'}
   }
 }
 
-// الاشتراك الفوري في تعديلات جدول الجلسات لإرسال التقارير عند الإغلاق
+// الاشتراك في تعديلات جدول الجلسات لإرسال التقارير عند الإغلاق
 supabase
   .channel('sessions_update_queue')
   .on(
@@ -408,14 +447,12 @@ supabase
       let justClosed = false;
       if (newSession.ended_at && !newSession.is_open) {
         if (oldSession && typeof oldSession.is_open === 'boolean') {
-          // إذا كان السجل القديم يحتوي على حالة الجلسة، نتحقق من الانتقال الفعلي من مفتوح لمغلق
           justClosed = oldSession.is_open === true && newSession.is_open === false;
         } else {
-          // Fallback: نقارن وقت الإغلاق بوقت الخادم الحالي مع إعطاء سماحية أكبر (5 دقائق) لتفادي فروق التوقيت
           const endedTime = new Date(newSession.ended_at).getTime();
           const nowTime = Date.now();
           const diffMs = Math.abs(nowTime - endedTime);
-          justClosed = diffMs < 300000; // 5 دقائق (300000 مللي ثانية)
+          justClosed = diffMs < 300000;
         }
       }
 
@@ -427,7 +464,7 @@ supabase
   )
   .subscribe();
 
-// خادم ويب بسيط لإبقاء خدمة Render مجانية قيد العمل (Web Service) دون الحاجة لبطاقة ائتمان
+// خادم ويب بسيط لإبقاء خدمة البوت قيد العمل
 const port = process.env.PORT || 3000;
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -435,4 +472,3 @@ http.createServer((req, res) => {
 }).listen(port, () => {
   console.log(`🌐 خادم ويب البوت يعمل على المنفذ ${port}`);
 });
-
