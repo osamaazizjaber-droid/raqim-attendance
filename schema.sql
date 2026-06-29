@@ -520,49 +520,64 @@ BEGIN
     RAISE EXCEPTION 'غير مصرح لك بإنشاء مستخدمين جدد في المنصة';
   END IF;
 
-  -- 2. التحقق من عدم وجود البريد الإلكتروني مسبقاً
-  IF EXISTS (SELECT 1 FROM auth.users WHERE email = p_email) THEN
-    RAISE EXCEPTION 'البريد الإلكتروني المدخل مسجل بالفعل في النظام';
+  -- 2. التحقق من وجود المستخدم مسبقاً في auth.users
+  SELECT id INTO new_user_id FROM auth.users WHERE email = p_email;
+
+  IF new_user_id IS NOT NULL THEN
+    -- التحقق مما إذا كان لديه بروفايل في جدول admins أو professors
+    IF EXISTS (SELECT 1 FROM admins WHERE user_id = new_user_id) OR 
+       EXISTS (SELECT 1 FROM professors WHERE user_id = new_user_id) THEN
+      RAISE EXCEPTION 'البريد الإلكتروني المدخل مسجل بالفعل في النظام ومربوط بملف شخصي';
+    ELSE
+      -- الحساب معلق في auth.users بلا ملف شخصي، نقوم بإعادة تهيئته وربطه
+      encrypted_pw := crypt(p_password, gen_salt('bf'));
+      UPDATE auth.users 
+      SET encrypted_password = encrypted_pw, 
+          raw_user_meta_data = jsonb_build_object('full_name', p_name),
+          email_confirmed_at = COALESCE(email_confirmed_at, now()),
+          updated_at = now()
+      WHERE id = new_user_id;
+    END IF;
+  ELSE
+    -- 3. تشفير كلمة المرور بنمط bcrypt متوافق مع Supabase Auth
+    encrypted_pw := crypt(p_password, gen_salt('bf'));
+
+    -- 4. إدخال المستخدم في جدول auth.users التابع لسوبابيس
+    INSERT INTO auth.users (
+      instance_id,
+      id,
+      aud,
+      role,
+      email,
+      encrypted_password,
+      email_confirmed_at,
+      raw_app_meta_data,
+      raw_user_meta_data,
+      created_at,
+      updated_at,
+      confirmation_token,
+      email_change,
+      email_change_token_new,
+      recovery_token
+    ) VALUES (
+      '00000000-0000-0000-0000-000000000000',
+      gen_random_uuid(),
+      'authenticated',
+      'authenticated',
+      p_email,
+      encrypted_pw,
+      now(), -- تأكيد فوري لتجاوز إيميل التحقق
+      '{"provider":"email","providers":["email"]}',
+      jsonb_build_object('full_name', p_name),
+      now(),
+      now(),
+      '',
+      '',
+      '',
+      ''
+    )
+    RETURNING id INTO new_user_id;
   END IF;
-
-  -- 3. تشفير كلمة المرور بنمط bcrypt متوافق مع Supabase Auth
-  encrypted_pw := crypt(p_password, gen_salt('bf'));
-
-  -- 4. إدخال المستخدم في جدول auth.users التابع لسوبابيس
-  INSERT INTO auth.users (
-    instance_id,
-    id,
-    aud,
-    role,
-    email,
-    encrypted_password,
-    email_confirmed_at,
-    raw_app_meta_data,
-    raw_user_meta_data,
-    created_at,
-    updated_at,
-    confirmation_token,
-    email_change,
-    email_change_token_new,
-    recovery_token
-  ) VALUES (
-    '00000000-0000-0000-0000-000000000000',
-    gen_random_uuid(),
-    'authenticated',
-    'authenticated',
-    p_email,
-    encrypted_pw,
-    now(), -- تأكيد فوري لتجاوز إيميل التحقق
-    '{"provider":"email","providers":["email"]}',
-    jsonb_build_object('full_name', p_name),
-    now(),
-    now(),
-    '',
-    '',
-    '',
-    ''
-  )
-  RETURNING id INTO new_user_id;
 
   -- 5. إدخال البيانات في الجدول المناسب للدور
   IF p_role = 'university' OR p_role = 'college' THEN
