@@ -105,7 +105,7 @@ async function processResendRequest(request) {
     if (!student.telegram_chat_id) throw new Error('الطالب لم يقم بتسجيل وتفعيل البوت بعد');
 
     // 3. إرسال الكرت كصورة عبر تيليجرام
-    const frontendUrl = process.env.FRONTEND_URL || 'https://raqim-attendance.vercel.app';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://www.sys-wms.pro';
     const caption = `
 📥 <b>إعادة إرسال بطاقة الحضور الرسمية:</b>
 

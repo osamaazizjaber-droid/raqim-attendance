@@ -161,7 +161,7 @@ export const handleTextMessage = async (bot, msg) => {
       student.telegram_chat_id = chatId;
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://raqim-attendance.vercel.app';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://www.sys-wms.pro';
     const caption = `✅ <b>إليك بطاقة الحضور الرسمية الخاصة بك:</b>\n\n<b>الاسم:</b> ${student.full_name}\n<b>الرقم الجامعي:</b> ${student.student_number}\n<b>الجامعة:</b> ${student.colleges?.university || 'جامعة رقيم'}\n<b>الكلية:</b> ${student.colleges?.name || 'الكلية'}\n\n<i>احفظ هذه الصورة بجهازك لتتمكن من تسجيل حضورك بدون إنترنت بمسحها بواسطة جهاز الأستاذ.</i>\n\n📊 <b>للاستعلام عن نتائج امتحاناتك وتحميل شهادتك الرسمية:</b>\n<a href="${frontendUrl}/results">اضغط هنا لفتح بوابة النتائج وتنزيل الشهادة</a>\n<i>(يرجى إدخال رقمك الجامعي وحل مسألة التحقق الرياضية البسيطة التي ستظهر لك لاستلام النتيجة وتنزيل الشهادة)</i>`;
 
     if (student.telegram_file_id) {
