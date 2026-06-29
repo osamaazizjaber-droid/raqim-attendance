@@ -15,6 +15,9 @@ if (!token) {
   process.exit(1);
 }
 
+console.log('🔑 TELEGRAM_BOT_TOKEN is loaded: length =', token.length, ', prefix =', token.substring(0, 5) + '...' + token.substring(token.length - 5));
+console.log('🔗 SUPABASE_URL is loaded: prefix =', (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').substring(0, 15) + '...');
+
 // تهيئة البوت في وضع الاستطلاع النشط (Polling Mode)
 const bot = new TelegramBot(token, { polling: true });
 
