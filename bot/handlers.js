@@ -37,6 +37,7 @@ export const handleTextMessage = async (bot, msg) => {
   // نتجاهل الأوامر الرسمية التي تبدأ بـ /start أو /help لأنها تُعالج في مستمعيها الخاصين
   if (text.startsWith('/start') || text.startsWith('/help')) return;
 
+  try {
     // 2. التحقق مما إذا كان المدخل بريداً إلكترونياً (للأستاذ)
     if (text.includes('@')) {
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
