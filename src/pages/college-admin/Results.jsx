@@ -144,6 +144,77 @@ export default function CollegeAdminResults() {
     reader.readAsArrayBuffer(file);
   };
 
+  // توليد تلقائي للشهادات بعد الرفع أو التعديل
+  const autoGenerateCertificates = async (studentIds, academicYear) => {
+    if (!studentIds || studentIds.length === 0) return;
+    try {
+      const { data: collegeData } = await supabase
+        .from('colleges')
+        .select('name, university')
+        .eq('id', adminDetails.college_id)
+        .single();
+      const college = collegeData;
+      const university = { name: collegeData?.university || 'رقيم حضور' };
+
+      const { data: studentDetails } = await supabase
+        .from('students')
+        .select('id, full_name, student_number, department_id, stage_id, departments(name)')
+        .in('id', studentIds);
+
+      if (!studentDetails || studentDetails.length === 0) return;
+
+      const { data: allStudentResults } = await supabase
+        .from('results')
+        .select('*, courses(name)')
+        .in('student_id', studentIds)
+        .eq('academic_year', academicYear);
+
+      if (!allStudentResults || allStudentResults.length === 0) return;
+
+      for (const student of studentDetails) {
+        const studentResults = allStudentResults.filter(r => r.student_id === student.id);
+        if (studentResults.length === 0) continue;
+
+        const overallGrade = computeOverallGrade(studentResults);
+        const isPassed = computeIsPassed(studentResults);
+
+        const pdfBlob = await generateCertificatePDF({
+          student,
+          results: studentResults,
+          overallGrade,
+          isPassed,
+          academicYear,
+          university,
+          college,
+          department: student.departments
+        });
+
+        const path = `certificates/${student.id}/${academicYear.replace('/', '_')}.pdf`;
+        await supabase.storage
+          .from('certificates')
+          .upload(path, pdfBlob, {
+            contentType: 'application/pdf',
+            upsert: true
+          });
+
+        const { data: { publicUrl } } = supabase.storage.from('certificates').getPublicUrl(path);
+
+        await supabase
+          .from('certificates')
+          .upsert({
+            student_id: student.id,
+            academic_year: academicYear,
+            overall_grade: overallGrade,
+            is_passed: isPassed,
+            pdf_url: publicUrl,
+            generated_by: user?.id
+          }, { onConflict: 'student_id,academic_year' });
+      }
+    } catch (err) {
+      console.error('Error auto generating certificates:', err);
+    }
+  };
+
   const executeUpload = async () => {
     if (resultsPreview.length === 0) return;
     setIsUploading(true);
@@ -247,11 +318,16 @@ export default function CollegeAdminResults() {
 
       if (upsertErr) throw upsertErr;
 
-      showToast('تم الرفع بنجاح ✅', `تم معالجة وإدخال ${resultsToInsert.length} نتيجة اختبار بنجاح.`, 'success');
+      showToast('تم الرفع بنجاح ✅', `تم معالجة وإدخال ${resultsToInsert.length} نتيجة اختبار بنجاح وجاري توليد الشهادات تلقائياً في الخلفية.`, 'success');
       setIsUploadModalOpen(false);
       setResultsPreview([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
       fetchResults();
+
+      // التوليد التلقائي للشهادات للطلاب المتأثرين بالرفع في الخلفية دون تعطيل الواجهة
+      const uniqueStudentIds = Array.from(new Set(resultsToInsert.map(r => r.student_id)));
+      const uploadYear = resultsToInsert[0]?.academic_year || '2024/2025';
+      autoGenerateCertificates(uniqueStudentIds, uploadYear);
     } catch (err) {
       showToast('خطأ في الرفع', err.message || 'حدث خطأ أثناء معالجة النتائج', 'danger');
     } finally {
@@ -317,9 +393,15 @@ export default function CollegeAdminResults() {
         .eq('id', editForm.id);
 
       if (error) throw error;
-      showToast('تم التحديث', 'تم حفظ التعديلات بنجاح', 'success');
+      showToast('تم التحديث', 'تم حفظ التعديلات بنجاح وجاري تحديث الشهادة تلقائياً.', 'success');
       setIsEditModalOpen(false);
       fetchResults();
+
+      // التحديث التلقائي للشهادة الخاصة بالطالب
+      const currentResult = results.find(r => r.id === editForm.id);
+      if (currentResult) {
+        autoGenerateCertificates([currentResult.student_id], currentResult.academic_year);
+      }
     } catch (err) {
       showToast('خطأ', 'فشل تحديث الدرجة', 'danger');
     }
