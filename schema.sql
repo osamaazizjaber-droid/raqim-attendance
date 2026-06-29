@@ -276,6 +276,39 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- دالة جلب معرف جامعة المشرف للمستخدم الحالي
+CREATE OR REPLACE FUNCTION get_admin_university_id(usr_id uuid)
+RETURNS uuid AS $$
+DECLARE
+  univ_id uuid;
+BEGIN
+  SELECT university_id INTO univ_id FROM admins WHERE user_id = usr_id;
+  RETURN univ_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- دالة جلب معرف كلية المشرف للمستخدم الحالي
+CREATE OR REPLACE FUNCTION get_admin_college_id(usr_id uuid)
+RETURNS uuid AS $$
+DECLARE
+  col_id uuid;
+BEGIN
+  SELECT college_id INTO col_id FROM admins WHERE user_id = usr_id;
+  RETURN col_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- دالة جلب دور المشرف للمستخدم الحالي
+CREATE OR REPLACE FUNCTION get_admin_role(usr_id uuid)
+RETURNS text AS $$
+DECLARE
+  r text;
+BEGIN
+  SELECT role INTO r FROM admins WHERE user_id = usr_id;
+  RETURN r;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- =========================================================================
 -- سياسات حماية البيانات (Row Level Security - RLS)
 -- =========================================================================
@@ -311,72 +344,90 @@ CREATE POLICY "Super Admins can manage universities" ON universities FOR ALL USI
 CREATE POLICY "Everyone authenticated can view colleges" ON colleges FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Super Admin and Univ Admin can manage colleges" ON colleges FOR ALL USING (
   is_super_admin() OR 
-  university_id = (SELECT university_id FROM admins WHERE user_id = auth.uid() AND role = 'university')
+  (university_id = get_admin_university_id(auth.uid()) AND get_admin_role(auth.uid()) = 'university')
 );
 
 -- 4. سياسات departments
 CREATE POLICY "Everyone authenticated can view departments" ON departments FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Super Admin and College Admin can manage departments" ON departments FOR ALL USING (
   is_super_admin() OR 
-  college_id = (SELECT college_id FROM admins WHERE user_id = auth.uid() AND role = 'college')
+  (college_id = get_admin_college_id(auth.uid()) AND get_admin_role(auth.uid()) = 'college')
 );
 
 -- 5. سياسات stages
 CREATE POLICY "Everyone authenticated can view stages" ON stages FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Admins can manage stages" ON stages FOR ALL USING (is_super_admin() OR EXISTS (SELECT 1 FROM admins WHERE user_id = auth.uid()));
+CREATE POLICY "Admins can manage stages" ON stages FOR ALL USING (is_super_admin() OR get_admin_role(auth.uid()) IS NOT NULL);
 
 -- 6. سياسات courses
 CREATE POLICY "Everyone authenticated can view courses" ON courses FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Super Admin and College Admin can manage courses" ON courses FOR ALL USING (
   is_super_admin() OR 
-  department_id IN (SELECT id FROM departments WHERE college_id = (SELECT college_id FROM admins WHERE user_id = auth.uid() AND role = 'college'))
+  department_id IN (
+    SELECT id FROM departments 
+    WHERE college_id = get_admin_college_id(auth.uid()) 
+    AND get_admin_role(auth.uid()) = 'college'
+  )
 );
 
 -- 7. سياسات admins
 CREATE POLICY "Admins can view matching admin profiles" ON admins FOR SELECT TO authenticated USING (
   user_id = auth.uid() OR 
   is_super_admin() OR 
-  university_id = (SELECT university_id FROM admins WHERE user_id = auth.uid() AND role = 'university')
+  (university_id = get_admin_university_id(auth.uid()) AND get_admin_role(auth.uid()) = 'university')
 );
 CREATE POLICY "Super Admin and Univ Admin can write admins" ON admins FOR ALL USING (
   is_super_admin() OR 
-  (university_id = (SELECT university_id FROM admins WHERE user_id = auth.uid() AND role = 'university') AND role = 'college')
+  (
+    university_id = get_admin_university_id(auth.uid()) 
+    AND get_admin_role(auth.uid()) = 'university' 
+    AND role = 'college'
+  )
 );
 
 -- 8. سياسات professors
 CREATE POLICY "Professors can be viewed by admins and themselves" ON professors FOR SELECT TO authenticated USING (
   user_id = auth.uid() OR 
   is_super_admin() OR 
-  college_id = (SELECT college_id FROM admins WHERE user_id = auth.uid() AND role = 'college') OR
-  university_id = (SELECT university_id FROM admins WHERE user_id = auth.uid() AND role = 'university')
+  college_id = get_admin_college_id(auth.uid()) OR
+  university_id = get_admin_university_id(auth.uid())
 );
 CREATE POLICY "Super Admin and College Admin can manage professors" ON professors FOR ALL USING (
   is_super_admin() OR 
-  college_id = (SELECT college_id FROM admins WHERE user_id = auth.uid() AND role = 'college')
+  college_id = get_admin_college_id(auth.uid())
 );
 
 -- 9. سياسات professor_courses
 CREATE POLICY "Professors and admins can view course assignments" ON professor_courses FOR SELECT TO authenticated USING (
   is_super_admin() OR 
-  professor_id IN (SELECT id FROM professors WHERE user_id = auth.uid() OR college_id = (SELECT college_id FROM admins WHERE user_id = auth.uid() AND role = 'college'))
+  professor_id IN (
+    SELECT id FROM professors 
+    WHERE user_id = auth.uid() 
+    OR college_id = get_admin_college_id(auth.uid())
+  )
 );
 CREATE POLICY "Super Admin and College Admin can manage assignments" ON professor_courses FOR ALL USING (
   is_super_admin() OR 
-  professor_id IN (SELECT id FROM professors WHERE college_id = (SELECT college_id FROM admins WHERE user_id = auth.uid() AND role = 'college'))
+  professor_id IN (
+    SELECT id FROM professors 
+    WHERE college_id = get_admin_college_id(auth.uid())
+  )
 );
 
 -- 10. سياسات students
 CREATE POLICY "Everyone authenticated can view students" ON students FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Super Admin and College Admin can manage students" ON students FOR ALL USING (
   is_super_admin() OR 
-  college_id = (SELECT college_id FROM admins WHERE user_id = auth.uid() AND role = 'college')
+  college_id = get_admin_college_id(auth.uid())
 );
 
 -- 11. سياسات student_courses
 CREATE POLICY "Everyone authenticated can view student courses" ON student_courses FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Super Admin and College Admin can manage student courses" ON student_courses FOR ALL USING (
   is_super_admin() OR 
-  student_id IN (SELECT id FROM students WHERE college_id = (SELECT college_id FROM admins WHERE user_id = auth.uid() AND role = 'college'))
+  student_id IN (
+    SELECT id FROM students 
+    WHERE college_id = get_admin_college_id(auth.uid())
+  )
 );
 
 -- 12. سياسات sessions
@@ -384,7 +435,7 @@ CREATE POLICY "Everyone authenticated can view sessions" ON sessions FOR SELECT 
 CREATE POLICY "Professors can manage their sessions" ON sessions FOR ALL USING (
   is_super_admin() OR 
   professor_id = get_professor_id() OR 
-  EXISTS (SELECT 1 FROM admins WHERE user_id = auth.uid() AND college_id = (SELECT college_id FROM professors WHERE id = professor_id))
+  get_admin_college_id(auth.uid()) = (SELECT college_id FROM professors WHERE id = professor_id)
 );
 
 -- 13. سياسات attendance
@@ -398,33 +449,39 @@ CREATE POLICY "Professors can manage session attendance" ON attendance FOR ALL U
 CREATE POLICY "Everyone authenticated can view student migrations" ON student_migrations FOR SELECT TO authenticated USING (true);
 CREATE POLICY "College admins can log migrations" ON student_migrations FOR ALL USING (
   is_super_admin() OR 
-  EXISTS (SELECT 1 FROM admins WHERE user_id = auth.uid() AND role = 'college')
+  get_admin_role(auth.uid()) = 'college'
 );
 
 -- 15. سياسات results
 CREATE POLICY "Public results read access" ON results FOR SELECT USING (true);
 CREATE POLICY "Super Admin and College Admin can manage results" ON results FOR ALL USING (
   is_super_admin() OR 
-  student_id IN (SELECT id FROM students WHERE college_id = (SELECT college_id FROM admins WHERE user_id = auth.uid() AND role = 'college'))
+  student_id IN (
+    SELECT id FROM students 
+    WHERE college_id = get_admin_college_id(auth.uid())
+  )
 );
 
 -- 16. سياسات certificates
 CREATE POLICY "Public certificates read access" ON certificates FOR SELECT USING (true);
 CREATE POLICY "Super Admin and College Admin can manage certificates" ON certificates FOR ALL USING (
   is_super_admin() OR 
-  student_id IN (SELECT id FROM students WHERE college_id = (SELECT college_id FROM admins WHERE user_id = auth.uid() AND role = 'college'))
+  student_id IN (
+    SELECT id FROM students 
+    WHERE college_id = get_admin_college_id(auth.uid())
+  )
 );
 
 -- 17. سياسات telegram_resend_requests
 CREATE POLICY "Admins can manage resend requests" ON telegram_resend_requests FOR ALL USING (
   is_super_admin() OR 
-  EXISTS (SELECT 1 FROM admins WHERE user_id = auth.uid() AND role = 'college')
+  get_admin_role(auth.uid()) = 'college'
 );
 
 -- 18. سياسات user_creation_requests
 CREATE POLICY "Admins can manage creation requests" ON user_creation_requests FOR ALL USING (
   is_super_admin() OR 
-  EXISTS (SELECT 1 FROM admins WHERE user_id = auth.uid())
+  get_admin_role(auth.uid()) IS NOT NULL
 );
 
 -- =========================================================================
