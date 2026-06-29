@@ -48,6 +48,28 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
+  // ─── إصلاح دائم: التحقق من صحة الـ Webhook وإعادة تسجيله تلقائياً عند كل نشر جديد ───
+  // هذا يحل مشكلة توقف البوت بعد كل Deployment على Vercel بدون الحاجة لأي تدخل يدوي
+  try {
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const expectedWebhookUrl = `https://${host}/api/bot`;
+    
+    // التحقق من حالة الـ Webhook الحالية
+    const webhookInfoRes = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+    const webhookInfo = await webhookInfoRes.json();
+    const currentUrl = webhookInfo?.result?.url || '';
+
+    // إعادة التسجيل فقط إذا كان الرابط مختلفاً أو فارغاً
+    if (currentUrl !== expectedWebhookUrl) {
+      console.log(`🔄 Auto-healing webhook: was "${currentUrl}", setting to "${expectedWebhookUrl}"`);
+      await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${expectedWebhookUrl}`);
+    }
+  } catch (webhookCheckErr) {
+    // نتجاهل الأخطاء هنا حتى لا تعطل معالجة الرسائل الرئيسية
+    console.warn('⚠️ Webhook self-check error (non-fatal):', webhookCheckErr?.message);
+  }
+  // ──────────────────────────────────────────────────────────────────────────────────────────
+
   try {
     const body = req.body;
     console.log('Received Webhook Payload:', JSON.stringify(body));
@@ -90,6 +112,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+
 
 async function handleStart(chatId) {
   const welcomeText = `
