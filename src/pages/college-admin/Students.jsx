@@ -447,6 +447,25 @@ export default function CollegeAdminStudents() {
     }
   };
 
+  // دالة لتحميل نموذج ملف كشوف الطلاب بصيغة CSV تدعم الترميز العربي بترميز UTF-8 BOM
+  const downloadTemplate = () => {
+    const csvContent = 'full_name,student_number,department,stage,study_type\n' +
+      'علي أحمد حسين,2023/CS/0142,قسم علوم الحاسوب,المرحلة الأولى,صباحي\n' +
+      'فاطمة عباس محمد,2023/CS/0143,قسم علوم الحاسوب,المرحلة الأولى,مسائي\n' +
+      'أحمد رعد علي,2023/CS/0144,قسم علوم الحاسوب,المرحلة الثانية,صباحي\n' +
+      'زينب جعفر حسن,2023/CS/0145,قسم هندسة البرمجيات,المرحلة الأولى,صباحي\n';
+    
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'نموذج_طلاب_رقيم.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.student_number.includes(searchQuery);
@@ -720,11 +739,17 @@ export default function CollegeAdminStudents() {
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-              <Button variant="secondary" onClick={() => { setIsImportModalOpen(false); setCsvPreview([]); }} disabled={isImporting}>إلغاء</Button>
-              <Button onClick={executeImport} disabled={csvPreview.length === 0 || isImporting}>
-                <span>بدء الاستيراد وتوليد الكروت</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '1rem', width: '100%' }}>
+              <Button variant="secondary" onClick={downloadTemplate} style={{ marginLeft: 'auto' }}>
+                <Download size={16} />
+                <span>تحميل النموذج التجريبي (CSV)</span>
               </Button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <Button variant="secondary" onClick={() => { setIsImportModalOpen(false); setCsvPreview([]); }} disabled={isImporting}>إلغاء</Button>
+                <Button onClick={executeImport} disabled={csvPreview.length === 0 || isImporting}>
+                  <span>بدء الاستيراد وتوليد الكروت</span>
+                </Button>
+              </div>
             </div>
           </div>
         </Modal>
