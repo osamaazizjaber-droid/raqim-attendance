@@ -1,34 +1,14 @@
 import { supabase } from './supabase.js';
 
-// مخزن حالات المستخدمين في الذاكرة لتتبع عملية البحث عن النتائج والـ CAPTCHA
-const userStates = new Map();
-
-// مساعد تحويل الأرقام إلى أرقام عربية لعرضها في الكابتشا
-function toArabicNumerals(num) {
-  const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-  return num.toString().split('').map(d => arabicDigits[parseInt(d)] || d).join('');
-}
-
-// دالة لتوليد كابتشا حسابية عشوائية
-function generateCaptcha() {
-  const num1 = Math.floor(Math.random() * 9) + 1; // من 1 إلى 9
-  const num2 = Math.floor(Math.random() * 9) + 1; // من 1 إلى 9
-  const answer = num1 + num2;
-  const question = `للتحقق الأمني، كم يساوي: ${toArabicNumerals(num1)} + ${toArabicNumerals(num2)} ؟`;
-  return { num1, num2, answer, question };
-}
-
 // الترحيب باللغة العربية
 export const handleStart = async (bot, msg) => {
   const chatId = msg.chat.id;
-  userStates.delete(chatId); // تصفير أي حالة معلقة
 
   const welcomeText = `
-أهلاً بك في بوت منصة <b>رَقِيم</b> الرسمي لتسجيل الحضور والنتائج الجامعية! 🎓
+أهلاً بك في بوت منصة <b>رَقِيم</b> الرسمي لتسجيل الحضور الجامعي! 🎓
 
 👤 <b>للطلاب:</b>
-• للحصول على بطاقة الحضور: أرسل <b>الرقم الجامعي</b> مباشرة (مثال: <code>2023/CS/0142</code>).
-• لمعرفة درجاتك وامتحاناتك: أرسل أمر <code>/results</code> أو اكتب "نتائجي".
+• للحصول على بطاقة الحضور الرسمية (QR Card): أرسل <b>الرقم الجامعي</b> أو <b>الاسم الثلاثي الكامل</b> مباشرة (مثال: <code>2023/CS/0142</code>).
 
 👨‍🏫 <b>للأساتذة:</b>
 • لربط حسابك وتلقي تقارير المحاضرات تلقائياً: أرسل <b>بريدك الإلكتروني</b> المسجل بالمنصة.
@@ -39,14 +19,12 @@ export const handleStart = async (bot, msg) => {
 // التعليمات المساعدة
 export const handleHelp = async (bot, msg) => {
   const chatId = msg.chat.id;
-  userStates.delete(chatId);
 
   const helpText = `
 💡 <b>تعليمات استخدام بوت رقيم:</b>
 
-1️⃣ <b>استلام بطاقة الحضور:</b> أرسل رقمك الجامعي مباشرة، وسيقوم البوت بإرسال بطاقتك الشخصية المشفرة. احفظ الصورة لتظهرها للأستاذ أوفلاين في قاعة الدرس.
-2️⃣ <b>الاستعلام عن النتائج:</b> اكتب أمر <code>/results</code> أو كلمة "نتائجي"، ثم اتبع التعليمات الموضحة للتحقق الأمني والحصول على كشف درجاتك.
-3️⃣ <b>للأساتذة:</b> أرسل بريدك الإلكتروني لربط البوت وحسابك، لتستلم كشف الحضور والغياب والإحصائيات مباشرة فور إنهاء المحاضرة.
+1️⃣ <b>استلام بطاقة الحضور:</b> أرسل رقمك الجامعي أو اسمك الثلاثي المعتمد مباشرة، وسيقوم البوت بإرسال بطاقتك الشخصية المشفرة. احفظ الصورة لتظهرها للأستاذ أوفلاين في قاعة الدرس.
+2️⃣ <b>للأساتذة:</b> أرسل بريدك الإلكتروني لربط البوت وحسابك، لتستلم كشف الحضور والغياب والإحصائيات مباشرة فور إنهاء المحاضرة.
 `;
   await bot.sendMessage(chatId, helpText, { parse_mode: 'HTML' });
 };
@@ -58,153 +36,6 @@ export const handleTextMessage = async (bot, msg) => {
 
   // نتجاهل الأوامر الرسمية التي تبدأ بـ /start أو /help لأنها تُعالج في مستمعيها الخاصين
   if (text.startsWith('/start') || text.startsWith('/help')) return;
-
-  try {
-    // 0. التحقق من مسار طلب النتائج المبدئي
-    if (text === '/results' || text === '/نتائج' || text === 'نتائجي' || text === 'نتائج') {
-      userStates.set(chatId, { step: 'waiting_name' });
-      await bot.sendMessage(chatId, '📋 *الاستعلام عن نتائج الامتحانات*\n\nيرجى إرسال اسمك الثلاثي كاملاً كما هو مسجل في الكلية:');
-      return;
-    }
-
-    // 1. التحقق مما إذا كان المستخدم في حالة معينة لنظام النتائج
-    if (userStates.has(chatId)) {
-      const state = userStates.get(chatId);
-
-      // أ. انتظار الاسم الثلاثي
-      if (state.step === 'waiting_name') {
-        const studentName = text;
-        
-        // البحث عن الاسم (تطابق جزئي غير حساس لحالة الأحرف وتجاهل الفراغات الإضافية)
-        const { data: students, error: searchErr } = await supabase
-          .from('students')
-          .select('*, departments(name), stages(name)')
-          .ilike('full_name', `%${studentName}%`);
-
-        if (searchErr) throw searchErr;
-
-        if (!students || students.length === 0) {
-          await bot.sendMessage(chatId, '❌ عذراً، هذا الاسم غير مسجل بقاعدة بيانات الطلاب. يرجى إرسال الاسم بدقة أو مراجعة إدارة الكلية.');
-          return;
-        }
-
-        if (students.length > 1) {
-          // هناك تشابه في الأسماء، نطلب الرقم الجامعي للتأكيد
-          const matchesIds = students.map(s => s.id);
-          userStates.set(chatId, {
-            step: 'waiting_student_number',
-            name: studentName,
-            matches: students
-          });
-
-          let disambiguationMsg = `⚠️ وجدنا أكثر من طالب يطابق هذا الاسم:\n`;
-          students.forEach((s, idx) => {
-            disambiguationMsg += `• ${s.full_name} (${s.departments?.name || '-'} - ${s.stages?.name || '-'})\n`;
-          });
-          disambiguationMsg += `\nيرجى إرسال <b>رقمك الجامعي المعتمد</b> للتأكيد وتحديد حسابك:`;
-
-          await bot.sendMessage(chatId, disambiguationMsg, { parse_mode: 'HTML' });
-          return;
-        }
-
-        // طالب وحيد مطابق
-        const targetStudent = students[0];
-        const captcha = generateCaptcha();
-        
-        userStates.set(chatId, {
-          step: 'waiting_captcha',
-          studentId: targetStudent.id,
-          studentName: targetStudent.full_name,
-          studentDetails: targetStudent,
-          captchaAnswer: captcha.answer
-        });
-
-        await bot.sendMessage(chatId, `🔒 للتحقق الأمني ومنع استخدام برمجيات التتبع:\n\n<b>${captcha.question}</b>`, { parse_mode: 'HTML' });
-        return;
-      }
-
-      // ب. انتظار الرقم الجامعي للتأكيد عند وجود تشابه أسماء
-      if (state.step === 'waiting_student_number') {
-        const studentNumber = text;
-        const matchedStudent = state.matches.find(s => s.student_number.trim() === studentNumber);
-
-        if (!matchedStudent) {
-          await bot.sendMessage(chatId, '❌ الرقم الجامعي غير مطابق للأسماء المقترحة. يرجى إدخال الرقم الجامعي بدقة لتفادي حظر الاستعلام.');
-          return;
-        }
-
-        const captcha = generateCaptcha();
-        userStates.set(chatId, {
-          step: 'waiting_captcha',
-          studentId: matchedStudent.id,
-          studentName: matchedStudent.full_name,
-          studentDetails: matchedStudent,
-          captchaAnswer: captcha.answer
-        });
-
-        await bot.sendMessage(chatId, `🔒 للتحقق الأمني ومنع استخدام برمجيات التتبع:\n\n<b>${captcha.question}</b>`, { parse_mode: 'HTML' });
-        return;
-      }
-
-      // ج. التحقق من الكابتشا وعرض النتيجة
-      if (state.step === 'waiting_captcha') {
-        const userAnswer = parseInt(text.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))); // دعم الأرقام العربية والإنجليزية
-        
-        if (isNaN(userAnswer) || userAnswer !== state.captchaAnswer) {
-          // كابتشا خاطئة، نولد واحدة جديدة ونطلب إعادة المحاولة
-          const captcha = generateCaptcha();
-          userStates.set(chatId, {
-            ...state,
-            captchaAnswer: captcha.answer
-          });
-          await bot.sendMessage(chatId, `❌ إجابة خاطئة. يرجى المحاولة مجدداً:\n\n<b>${captcha.question}</b>`, { parse_mode: 'HTML' });
-          return;
-        }
-
-        // إجابة صحيحة، جلب وعرض كشف الدرجات
-        await bot.sendChatAction(chatId, 'typing');
-
-        const { data: results, error: resErr } = await supabase
-          .from('results')
-          .select('*, courses(name)')
-          .eq('student_id', state.studentId);
-
-        if (resErr) throw resErr;
-
-        // تنظيف حالة الـ CAPTCHA
-        userStates.delete(chatId);
-
-        if (!results || results.length === 0) {
-          await bot.sendMessage(chatId, `📋 نتائج الطالب: <b>${state.studentName}</b>\n\nعذراً، لم ترفع نتائج امتحاناتك لهذا العام الدراسي بعد. تواصل مع إدارة كليتك لمزيد من المعلومات.`, { parse_mode: 'HTML' });
-          return;
-        }
-
-        // صياغة وعرض كشف الدرجات
-        const studentInfo = state.studentDetails;
-        let resultsText = `📋 <b>نتائج الطالب:</b> ${state.studentName}\n`;
-        resultsText += `🎓 <b>المرحلة:</b> ${studentInfo.stages?.name || '-'} | <b>القسم:</b> ${studentInfo.departments?.name || '-'}\n\n`;
-
-        const gradeIcons = {
-          'امتياز': '🏆 امتياز',
-          'جيد جداً': '✅ جيد جداً',
-          'جيد': '✅ جيد',
-          'متوسط': '⚠️ متوسط',
-          'مقبول': '⚠️ مقبول',
-          'ضعيف': '❌ ضعيف'
-        };
-
-        results.forEach(r => {
-          const badge = gradeIcons[r.grade_label] || r.grade_label;
-          resultsText += `• ${r.courses?.name || 'مادة'} ............. ${badge}\n`;
-        });
-
-        const frontendUrl = process.env.FRONTEND_URL || 'https://raqim-attendance.vercel.app';
-        resultsText += `\n📥 <b>لتحميل وتنزيل شهادتك الرسمية المعتمدة (PDF):</b>\n<a href="${frontendUrl}/results">اضغط هنا لفتح بوابة النتائج وتنزيل الشهادة</a>`;
-
-        await bot.sendMessage(chatId, resultsText, { parse_mode: 'HTML' });
-        return;
-      }
-    }
 
     // 2. التحقق مما إذا كان المدخل بريداً إلكترونياً (للأستاذ)
     if (text.includes('@')) {
