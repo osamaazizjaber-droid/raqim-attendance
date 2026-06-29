@@ -298,8 +298,14 @@ export const handleTextMessage = async (bot, msg) => {
       return;
     }
 
-    // ربط chat_id للطالب الحالي بالرقم الجامعي تلقائياً عند طلب البطاقة
-    if (student.telegram_chat_id !== chatId) {
+    // التحقق من حالة الربط لحماية الخصوصية ومنع الحصول على الـ QR من طالب آخر
+    if (student.telegram_chat_id && student.telegram_chat_id !== chatId) {
+      await bot.sendMessage(chatId, '❌ هذا الحساب الجامعي مرتبط بالفعل بحساب تيليجرام آخر لمنع التزوير وحماية خصوصية الطالب.\n\nإذا كنت صاحب الحساب وتواجه مشكلة، يرجى مراجعة عمادة الكلية لإلغاء الربط وإعادة تفعيل الحساب.');
+      return;
+    }
+
+    // ربط الحساب لأول مرة إذا لم يكن مرتبطاً
+    if (!student.telegram_chat_id) {
       await supabase
         .from('students')
         .update({ telegram_chat_id: chatId })
