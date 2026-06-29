@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Search, GraduationCap, Lock, HelpCircle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Search, GraduationCap, Lock, HelpCircle, ArrowLeft, RefreshCw, Download } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/Button';
 import logo from '../../assets/logo.png';
 import compStyles from '../../styles/components.module.css';
+import { computeOverallGrade, computeIsPassed } from '../../lib/gradeUtils';
+import { generateCertificatePDF } from '../../lib/certificateGenerator';
 
 // مساعد تحويل الأرقام إلى أرقام عربية لعرضها في الكابتشا
 function toArabicNumerals(num) {
@@ -57,7 +59,7 @@ export default function ResultsLookup() {
       // 2. البحث عن الطالب بواسطة الرقم الجامعي
       const { data: student, error: studErr } = await supabase
         .from('students')
-        .select('*, departments(name), stages(name)')
+        .select('*, departments(name), stages(name), colleges(name, university)')
         .eq('student_number', studentNumber.trim())
         .maybeSingle();
 
@@ -85,6 +87,36 @@ export default function ResultsLookup() {
     } catch (err) {
       setError('حدث خطأ غير متوقع أثناء معالجة البحث.');
       generateNewCaptcha();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadCertificate = async () => {
+    try {
+      setLoading(true);
+      const overallGrade = computeOverallGrade(results);
+      const isPassed = computeIsPassed(results);
+      const academicYear = results[0]?.academic_year || '2024/2025';
+      const university = { name: studentData?.colleges?.university || 'جامعة رقيم' };
+      const college = { name: studentData?.colleges?.name || 'الكلية' };
+      const department = { name: studentData?.departments?.name || 'القسم' };
+
+      const pdfDoc = await generateCertificatePDF({
+        student: studentData,
+        results,
+        overallGrade,
+        isPassed,
+        academicYear,
+        university,
+        college,
+        department
+      });
+
+      pdfDoc.save(`${studentData.full_name.replace(/\s+/g, '_')}_شهادة.pdf`);
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء توليد وتحميل الشهادة.');
     } finally {
       setLoading(false);
     }
@@ -281,7 +313,27 @@ export default function ResultsLookup() {
               </div>
             )}
 
-            <Button variant="secondary" onClick={resetForm} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+            {results.length > 0 && (
+              <Button 
+                onClick={handleDownloadCertificate} 
+                disabled={loading}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '0.5rem', 
+                  width: '100%', 
+                  backgroundColor: 'var(--success)', 
+                  color: '#ffffff',
+                  marginBottom: '0.5rem'
+                }}
+              >
+                <Download size={18} />
+                <span>{loading ? 'جاري توليد الشهادة...' : 'تحميل الشهادة الرسمية (PDF)'}</span>
+              </Button>
+            )}
+
+            <Button variant="secondary" onClick={resetForm} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%' }}>
               <ArrowLeft size={16} />
               <span>الرجوع والبحث من جديد</span>
             </Button>
