@@ -1,8 +1,14 @@
 import TelegramBot from 'node-telegram-bot-api';
 import dotenv from 'dotenv';
 import http from 'http';
+import dns from 'dns';
 import { supabase } from './supabase.js';
 import { handleStart, handleHelp, handleTextMessage } from './handlers.js';
+
+// إجبار Node.js على تفضيل IPv4 لتفادي مشاكل الاتصال المعلق في بعض بيئات Docker (Hugging Face)
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 // تحميل متغيرات البيئة (يبحث في المجلد الحالي والمجلد الأب)
 dotenv.config();
@@ -18,20 +24,51 @@ if (!token) {
 console.log('🔑 TELEGRAM_BOT_TOKEN is loaded: length =', token.length, ', prefix =', token.substring(0, 5) + '...' + token.substring(token.length - 5));
 console.log('🔗 SUPABASE_URL is loaded: prefix =', (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').substring(0, 15) + '...');
 
-// تهيئة البوت في وضع الاستطلاع النشط (Polling Mode)
-const bot = new TelegramBot(token, { polling: true });
+// اختبار الاتصال بـ Telegram API عند الإقلاع
+try {
+  const testRes = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+  const testData = await testRes.json();
+  console.log('📡 Telegram API Connection Test:', testRes.status, testData.ok ? 'SUCCESS' : 'FAILED', testData.result?.username);
+} catch (err) {
+  console.error('❌ Failed to connect to Telegram API:', err.message || err);
+}
+
+// تهيئة البوت وتأجيل بدء الاستطلاع لضمان تسجيل المستمعين أولاً
+const bot = new TelegramBot(token);
 
 // تسجيل مستمع لأخطاء الاستطلاع لتجنب توقف البوت
 bot.on('polling_error', (error) => {
   console.error('⚠️ Polling error:', error.message || error);
 });
 
+// تسجيل مستمع للأخطاء العامة للبوت
+bot.on('error', (error) => {
+  console.error('⚠️ General Bot Error:', error.message || error);
+});
+
 console.log('🤖 بوت رقيم لتيليجرام يعمل الآن بنجاح...');
 
 // تسجيل المستمعين لأوامر البوت والرسائل
-bot.onText(/\/start/, (msg) => handleStart(bot, msg));
-bot.onText(/\/help/, (msg) => handleHelp(bot, msg));
-bot.on('message', (msg) => handleTextMessage(bot, msg));
+bot.onText(/\/start/, (msg) => {
+  console.log(`📥 [Command /start] received from ${msg.from?.username || msg.from?.id}`);
+  handleStart(bot, msg);
+});
+
+bot.onText(/\/help/, (msg) => {
+  console.log(`📥 [Command /help] received from ${msg.from?.username || msg.from?.id}`);
+  handleHelp(bot, msg);
+});
+
+bot.on('message', (msg) => {
+  // تفادي طباعة الأوامر المسجلة بالفعل مرتين
+  if (msg.text && (msg.text.startsWith('/start') || msg.text.startsWith('/help'))) return;
+  console.log(`📥 [Message] received from ${msg.from?.username || msg.from?.id}: "${msg.text || '[Non-text message]'}"`);
+  handleTextMessage(bot, msg);
+});
+
+// بدء الاستطلاع يدوياً بعد تسجيل كافة المستمعين
+console.log('🔄 البدء الفعلي للاستطلاع (Manual Polling Start)...');
+bot.startPolling();
 
 /**
  * وظيفة لمعالجة طلب إعادة إرسال كود QR وتحديث قاعدة البيانات.
