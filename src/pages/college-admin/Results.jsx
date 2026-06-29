@@ -90,7 +90,7 @@ export default function CollegeAdminResults() {
         .select('*');
       setGradeScales(scales || []);
 
-      setSelectedYear(academicYears[1]); // Default 2024/2025
+      setSelectedYear(''); // Default: جميع السنوات الدراسية
 
     } catch (err) {
       showToast('خطأ', 'فشل تحميل بيانات التهيئة', 'danger');
@@ -186,7 +186,8 @@ export default function CollegeAdminResults() {
           row['السنة الدراسية'] || 
           row['العام الدراسي'] || 
           row['السنة'] || 
-          selectedYear
+          selectedYear ||
+          '2024/2025'
         ).trim();
 
         const studentId = studentsMap.get(studNum);
@@ -636,6 +637,7 @@ export default function CollegeAdminResults() {
 
           <div className={compStyles.inputGroup} style={{ margin: 0, minWidth: '120px' }}>
             <select className={compStyles.input} value={selectedYear} onChange={e => setSelectedYear(e.target.value)}>
+              <option value="">جميع السنوات الدراسية</option>
               {academicYears.map(y => (
                 <option key={y} value={y}>{y}</option>
               ))}
