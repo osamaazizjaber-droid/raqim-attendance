@@ -337,6 +337,36 @@ export default function CollegeAdminResults() {
     }
   };
 
+  // Delete all filtered results
+  const handleDeleteAllResults = async () => {
+    if (filteredResults.length === 0) return;
+    if (!window.confirm(`🚨 تحذير: هل أنت متأكد من حذف جميع النتائج المعروضة حالياً بالفلتر (${filteredResults.length} نتيجة)؟ سيتم إزالة الدرجات والتقديرات نهائياً!`)) return;
+    if (!window.confirm('⚠️ تأكيد نهائي: هذه العملية لا يمكن التراجع عنها.')) return;
+
+    setLoading(true);
+    try {
+      const resultIds = filteredResults.map(r => r.id);
+      
+      // نقسم الحذف إلى دفعات إذا كان العدد كبيراً لتجنب أخطاء حدود الاستعلام
+      const chunkSize = 100;
+      for (let i = 0; i < resultIds.length; i += chunkSize) {
+        const chunk = resultIds.slice(i, i + chunkSize);
+        const { error } = await supabase
+          .from('results')
+          .delete()
+          .in('id', chunk);
+        if (error) throw error;
+      }
+
+      showToast('نجاح', 'تم حذف النتائج المفلترة بنجاح', 'success');
+      fetchResults();
+    } catch (err) {
+      showToast('خطأ', err.message || 'فشل حذف النتائج', 'danger');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Certificate Generator Flow (PDF & ZIP Bulk)
   const [numStudentsToGen, setNumStudentsToGen] = useState(0);
   const [studentsToGen, setStudentsToGen] = useState([]);
@@ -622,6 +652,13 @@ export default function CollegeAdminResults() {
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
+
+          {filteredResults.length > 0 && (
+            <Button variant="danger" size="sm" onClick={handleDeleteAllResults}>
+              <Trash2 size={16} />
+              <span>حذف كل المفلترين ({filteredResults.length})</span>
+            </Button>
+          )}
         </div>
 
         {loading ? (
