@@ -130,9 +130,9 @@ export const handleTextMessage = async (bot, msg) => {
             // وجد أكثر من طالب بنفس الاسم
             let responseMsg = `🔍 <b>تم العثور على أكثر من طالب يطابق هذا الاسم:</b>\n\n`;
             studentsByName.slice(0, 5).forEach((s, index) => {
-              responseMsg += `${index + 1}. <b>الاسم:</b> ${s.full_name}\n   <b>الرقم الجامعي:</b> <code>${s.student_number}</code>\n   <b>القسم:</b> ${s.departments?.name || '-'}\n\n`;
+              responseMsg += `${index + 1}. <b>الاسم:</b> ${s.full_name}\n   <b>القسم:</b> ${s.departments?.name || '-'}\n   <b>نوع الدراسة:</b> ${s.study_type || '-'}\n\n`;
             });
-            responseMsg += `⚠️ يرجى إعادة إرسال اسمك الثلاثي الكامل بدقة، أو إرسال <b>الرقم الجامعي</b> المكتوب أمام اسمك للحصول على بطاقتك الخاصة.`;
+            responseMsg += `⚠️ يرجى إعادة إرسال اسمك الرباعي الكامل بدقة، أو البحث مباشرة بواسطة <b>الرقم الجامعي الخاص بك</b> للحصول على بطاقتك الخاصة.`;
             
             await bot.sendMessage(chatId, responseMsg, { parse_mode: 'HTML' });
             return;
