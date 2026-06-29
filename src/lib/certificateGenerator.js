@@ -48,16 +48,58 @@ export const generateCertificatePDF = async ({
       ctx.lineWidth = 4;
       ctx.strokeRect(85, 85, width - 170, height - 170);
 
-      // ج. رسم زخارف على الزوايا الأربعة للشهادة لإضفاء مظهر رسمي ملكي
+      // ج. رسم زخارف فاخرة على الزوايا الأربعة للشهادة لإضفاء مظهر رسمي ملكي
       const drawCornerOrnament = (x, y, xDir, yDir) => {
         ctx.fillStyle = '#C9A84C';
-        ctx.fillRect(x, y, xDir * 80, yDir * 8);
-        ctx.fillRect(x, y, xDir * 8, yDir * 80);
+        // الزاوية الخارجية السميكة
+        ctx.fillRect(x, y, xDir * 100, yDir * 8);
+        ctx.fillRect(x, y, xDir * 8, yDir * 100);
+        // خط موازٍ داخلي رفيع
+        ctx.fillRect(x + xDir * 20, y + yDir * 20, xDir * 50, yDir * 3);
+        ctx.fillRect(x + xDir * 20, y + yDir * 20, xDir * 3, yDir * 50);
+        // نقطة ديكورية دائرية عند التقاء الزوايا الداخلية
+        ctx.beginPath();
+        ctx.arc(x + xDir * 85, y + yDir * 85, 7, 0, 2 * Math.PI);
+        ctx.fill();
       };
       drawCornerOrnament(100, 100, 1, 1);       // أعلى اليسار
       drawCornerOrnament(width - 100, 100, -1, 1); // أعلى اليمين
       drawCornerOrnament(100, height - 100, 1, -1); // أسفل اليسار
       drawCornerOrnament(width - 100, height - 100, -1, -1); // أسفل اليمين
+
+      // د. رسم خلفية مائية دائرية ذهبية باهتة في منتصف الوثيقة (Watermark)
+      const drawWatermark = () => {
+        const cx = width / 2;
+        const cy = height / 2 + 120; // متمركز تحت العنوان وحول الجداول
+        
+        ctx.strokeStyle = 'rgba(201, 168, 76, 0.035)'; // ذهبي باهت جداً
+        ctx.lineWidth = 3;
+        
+        // الدائرة الكبرى
+        ctx.beginPath();
+        ctx.arc(cx, cy, 320, 0, 2 * Math.PI);
+        ctx.stroke();
+
+        // الدائرة الصغرى
+        ctx.beginPath();
+        ctx.arc(cx, cy, 285, 0, 2 * Math.PI);
+        ctx.stroke();
+
+        // خطوط قطرية زخرفية (أشعة شمس)
+        for (let i = 0; i < 16; i++) {
+          const angle = (i * Math.PI) / 8;
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(angle) * 285, cy + Math.sin(angle) * 285);
+          ctx.lineTo(cx + Math.cos(angle) * 320, cy + Math.sin(angle) * 320);
+          ctx.stroke();
+        }
+
+        // دائرة داخلية أصغر
+        ctx.beginPath();
+        ctx.arc(cx, cy, 140, 0, 2 * Math.PI);
+        ctx.stroke();
+      };
+      drawWatermark();
 
       // 4. كتابة النصوص والترويسة
       ctx.fillStyle = '#1E293B';
@@ -103,10 +145,39 @@ export const generateCertificatePDF = async ({
       ctx.closePath();
       ctx.fill();
 
-      // هـ. عنوان الوثيقة
-      ctx.font = 'bold 52px Tajawal, Arial, sans-serif';
+      // هـ. عنوان الوثيقة مع إطار خلفي ذهبي فاخر ومزخرف
+      const titleText = `وثيقة نتائج امتحانات الطلبة للعام الدراسي ${academicYear}`;
+      ctx.font = 'bold 46px Tajawal, Arial, sans-serif';
+      const textWidth = ctx.measureText(titleText).width;
+      
+      const bannerW = textWidth + 140;
+      const bannerH = 96;
+      const bannerX = width / 2 - bannerW / 2;
+      const bannerY = 475;
+      const r = 24;
+      
+      // خلفية خفيفة ذهبية
+      ctx.fillStyle = 'rgba(201, 168, 76, 0.05)';
+      ctx.beginPath();
+      ctx.moveTo(bannerX + r, bannerY);
+      ctx.lineTo(bannerX + bannerW - r, bannerY);
+      ctx.quadraticCurveTo(bannerX + bannerW, bannerY, bannerX + bannerW, bannerY + r);
+      ctx.lineTo(bannerX + bannerW, bannerY + bannerH - r);
+      ctx.quadraticCurveTo(bannerX + bannerW, bannerY + bannerH, bannerX + bannerW - r, bannerY + bannerH);
+      ctx.lineTo(bannerX + r, bannerY + bannerH);
+      ctx.quadraticCurveTo(bannerX, bannerY + bannerH, bannerX, bannerY + bannerH - r);
+      ctx.lineTo(bannerX, bannerY + r);
+      ctx.quadraticCurveTo(bannerX, bannerY, bannerX + r, bannerY);
+      ctx.closePath();
+      ctx.fill();
+      
+      // إطار ذهبي رفيع
+      ctx.strokeStyle = 'rgba(201, 168, 76, 0.35)';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
       ctx.fillStyle = '#0F172A';
-      ctx.fillText(`وثيقة نتائج امتحانات الطلبة للعام الدراسي ${academicYear}`, width / 2, 530);
+      ctx.fillText(titleText, width / 2, 539);
 
       // و. تفاصيل الطالب
       ctx.font = 'bold 36px Tajawal, Arial, sans-serif';
@@ -132,6 +203,16 @@ export const generateCertificatePDF = async ({
           ctx.fillStyle = '#0F172A'; // خلفية كحلي داكن
           ctx.fillRect(x, startY, colWidth, rowHeight);
           ctx.strokeRect(x, startY, colWidth, rowHeight);
+
+          // شريط علوي ذهبي لترويسة الجدول لإضافة لمسة جمالية
+          ctx.strokeStyle = '#C9A84C';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(x, startY);
+          ctx.lineTo(x + colWidth, startY);
+          ctx.stroke();
+          ctx.strokeStyle = '#E2E8F0'; // إعادة اللون للون الافتراضي للجدول
+          ctx.lineWidth = 2;
 
           // كتابة اسم المادة والوحدات
           ctx.fillStyle = '#ffffff';
