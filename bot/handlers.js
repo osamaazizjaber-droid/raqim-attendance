@@ -24,16 +24,16 @@ export const handleStart = async (bot, msg) => {
   userStates.delete(chatId); // تصفير أي حالة معلقة
 
   const welcomeText = `
-أهلاً بك في بوت منصة *رَقِيم* الرسمي لتسجيل الحضور والنتائج الجامعية! 🎓
+أهلاً بك في بوت منصة <b>رَقِيم</b> الرسمي لتسجيل الحضور والنتائج الجامعية! 🎓
 
-👤 *للطلاب:*
-* للحصول على بطاقة الحضور: أرسل **رقمك الجامعي** مباشرة (مثال: \`2023/CS/0142\`).
-* لمعرفة درجاتك وامتحاناتك: أرسل أمر \`/results\` أو اكتب "نتائجي".
+👤 <b>للطلاب:</b>
+• للحصول على بطاقة الحضور: أرسل <b>الرقم الجامعي</b> مباشرة (مثال: <code>2023/CS/0142</code>).
+• لمعرفة درجاتك وامتحاناتك: أرسل أمر <code>/results</code> أو اكتب "نتائجي".
 
-👨‍🏫 *للأساتذة:*
-* لربط حسابك وتلقي تقارير المحاضرات تلقائياً: أرسل **بريدك الإلكتروني** المسجل بالمنصة.
+👨‍🏫 <b>للأساتذة:</b>
+• لربط حسابك وتلقي تقارير المحاضرات تلقائياً: أرسل <b>بريدك الإلكتروني</b> المسجل بالمنصة.
 `;
-  await bot.sendMessage(chatId, welcomeText, { parse_mode: 'Markdown' });
+  await bot.sendMessage(chatId, welcomeText, { parse_mode: 'HTML' });
 };
 
 // التعليمات المساعدة
@@ -42,13 +42,13 @@ export const handleHelp = async (bot, msg) => {
   userStates.delete(chatId);
 
   const helpText = `
-💡 *تعليمات استخدام بوت رقيم:*
+💡 <b>تعليمات استخدام بوت رقيم:</b>
 
-1️⃣ *استلام بطاقة الحضور:* أرسل رقمك الجامعي مباشرة، وسيقوم البوت بإرسال بطاقتك الشخصية المشفرة. احفظ الصورة لتظهرها للأستاذ أوفلاين في قاعة الدرس.
-2️⃣ *الاستعلام عن النتائج:* اكتب أمر \`/results\` أو كلمة "نتائجي"، ثم اتبع التعليمات الموضحة للتحقق الأمني والحصول على كشف درجاتك.
-3️⃣ *للأساتذة:* أرسل بريدك الإلكتروني لربط البوت وحسابك، لتستلم كشف الحضور والغياب والإحصائيات مباشرة فور إنهاء المحاضرة.
+1️⃣ <b>استلام بطاقة الحضور:</b> أرسل رقمك الجامعي مباشرة، وسيقوم البوت بإرسال بطاقتك الشخصية المشفرة. احفظ الصورة لتظهرها للأستاذ أوفلاين في قاعة الدرس.
+2️⃣ <b>الاستعلام عن النتائج:</b> اكتب أمر <code>/results</code> أو كلمة "نتائجي"، ثم اتبع التعليمات الموضحة للتحقق الأمني والحصول على كشف درجاتك.
+3️⃣ <b>للأساتذة:</b> أرسل بريدك الإلكتروني لربط البوت وحسابك، لتستلم كشف الحضور والغياب والإحصائيات مباشرة فور إنهاء المحاضرة.
 `;
-  await bot.sendMessage(chatId, helpText, { parse_mode: 'Markdown' });
+  await bot.sendMessage(chatId, helpText, { parse_mode: 'HTML' });
 };
 
 // معالجة كافة الرسائل النصية والتحكم في الحالات
@@ -101,9 +101,9 @@ export const handleTextMessage = async (bot, msg) => {
           students.forEach((s, idx) => {
             disambiguationMsg += `• ${s.full_name} (${s.departments?.name || '-'} - ${s.stages?.name || '-'})\n`;
           });
-          disambiguationMsg += `\nيرجى إرسال *رقمك الجامعي المعتمد* للتأكيد وتحديد حسابك:`;
+          disambiguationMsg += `\nيرجى إرسال <b>رقمك الجامعي المعتمد</b> للتأكيد وتحديد حسابك:`;
 
-          await bot.sendMessage(chatId, disambiguationMsg, { parse_mode: 'Markdown' });
+          await bot.sendMessage(chatId, disambiguationMsg, { parse_mode: 'HTML' });
           return;
         }
 
@@ -119,7 +119,7 @@ export const handleTextMessage = async (bot, msg) => {
           captchaAnswer: captcha.answer
         });
 
-        await bot.sendMessage(chatId, `🔒 للتحقق الأمني ومنع استخدام برمجيات التتبع:\n\n*${captcha.question}*`, { parse_mode: 'Markdown' });
+        await bot.sendMessage(chatId, `🔒 للتحقق الأمني ومنع استخدام برمجيات التتبع:\n\n<b>${captcha.question}</b>`, { parse_mode: 'HTML' });
         return;
       }
 
@@ -142,7 +142,7 @@ export const handleTextMessage = async (bot, msg) => {
           captchaAnswer: captcha.answer
         });
 
-        await bot.sendMessage(chatId, `🔒 للتحقق الأمني ومنع استخدام برمجيات التتبع:\n\n*${captcha.question}*`, { parse_mode: 'Markdown' });
+        await bot.sendMessage(chatId, `🔒 للتحقق الأمني ومنع استخدام برمجيات التتبع:\n\n<b>${captcha.question}</b>`, { parse_mode: 'HTML' });
         return;
       }
 
@@ -157,7 +157,7 @@ export const handleTextMessage = async (bot, msg) => {
             ...state,
             captchaAnswer: captcha.answer
           });
-          await bot.sendMessage(chatId, `❌ إجابة خاطئة. يرجى المحاولة مجدداً:\n\n*${captcha.question}*`, { parse_mode: 'Markdown' });
+          await bot.sendMessage(chatId, `❌ إجابة خاطئة. يرجى المحاولة مجدداً:\n\n<b>${captcha.question}</b>`, { parse_mode: 'HTML' });
           return;
         }
 
@@ -175,14 +175,14 @@ export const handleTextMessage = async (bot, msg) => {
         userStates.delete(chatId);
 
         if (!results || results.length === 0) {
-          await bot.sendMessage(chatId, `📋 نتائج الطالب: *${state.studentName}*\n\nعذراً، لم ترفع نتائج امتحاناتك لهذا العام الدراسي بعد. تواصل مع إدارة كليتك لمزيد من المعلومات.`, { parse_mode: 'Markdown' });
+          await bot.sendMessage(chatId, `📋 نتائج الطالب: <b>${state.studentName}</b>\n\nعذراً، لم ترفع نتائج امتحاناتك لهذا العام الدراسي بعد. تواصل مع إدارة كليتك لمزيد من المعلومات.`, { parse_mode: 'HTML' });
           return;
         }
 
         // صياغة وعرض كشف الدرجات
         const studentInfo = state.studentDetails;
-        let resultsText = `📋 *نتائج الطالب:* ${state.studentName}\n`;
-        resultsText += `🎓 *المرحلة:* ${studentInfo.stages?.name || '-'} | *القسم:* ${studentInfo.departments?.name || '-'}\n\n`;
+        let resultsText = `📋 <b>نتائج الطالب:</b> ${state.studentName}\n`;
+        resultsText += `🎓 <b>المرحلة:</b> ${studentInfo.stages?.name || '-'} | <b>القسم:</b> ${studentInfo.departments?.name || '-'}\n\n`;
 
         const gradeIcons = {
           'امتياز': '🏆 امتياز',
@@ -199,9 +199,9 @@ export const handleTextMessage = async (bot, msg) => {
         });
 
         const frontendUrl = process.env.FRONTEND_URL || 'https://raqim-attendance.vercel.app';
-        resultsText += `\n📥 *لتحميل وتنزيل شهادتك الرسمية المعتمدة (PDF):*\n[اضغط هنا لفتح بوابة النتائج وتنزيل الشهادة](${frontendUrl}/results)`;
+        resultsText += `\n📥 <b>لتحميل وتنزيل شهادتك الرسمية المعتمدة (PDF):</b>\n<a href="${frontendUrl}/results">اضغط هنا لفتح بوابة النتائج وتنزيل الشهادة</a>`;
 
-        await bot.sendMessage(chatId, resultsText, { parse_mode: 'Markdown' });
+        await bot.sendMessage(chatId, resultsText, { parse_mode: 'HTML' });
         return;
       }
     }
@@ -243,13 +243,13 @@ export const handleTextMessage = async (bot, msg) => {
       if (updateErr) throw updateErr;
 
       const successMsg = `
-✅ *أهلاً بك يا دكتور ${professor.name}!*
-تم تفعيل البوت وربطه بحسابك كأستاذ في منصة *رَقِيم* بنجاح.
+✅ <b>أهلاً بك يا دكتور ${professor.name}!</b>
+تم تفعيل البوت وربطه بحسابك كأستاذ في منصة <b>رَقِيم</b> بنجاح.
 
-📧 *البريد الإلكتروني:* ${professor.email}
-🎓 *ستتلقى تقرير الحضور التفصيلي تلقائياً عبر تيليجرام فور انتهاء كل محاضرة تقوم بتسجيلها.*
+📧 <b>البريد الإلكتروني:</b> ${professor.email}
+🎓 <b>ستتلقى تقرير الحضور التفصيلي تلقائياً عبر تيليجرام فور انتهاء كل محاضرة تقوم بتسجيلها.</b>
 `;
-      await bot.sendMessage(chatId, successMsg, { parse_mode: 'Markdown' });
+      await bot.sendMessage(chatId, successMsg, { parse_mode: 'HTML' });
       return;
     }
 
@@ -296,13 +296,13 @@ export const handleTextMessage = async (bot, msg) => {
             student = studentsByName[0];
           } else {
             // وجد أكثر من طالب بنفس الاسم
-            let responseMsg = `🔍 *تم العثور على أكثر من طالب يطابق هذا الاسم:*\n\n`;
+            let responseMsg = `🔍 <b>تم العثور على أكثر من طالب يطابق هذا الاسم:</b>\n\n`;
             studentsByName.slice(0, 5).forEach((s, index) => {
-              responseMsg += `${index + 1}. *الاسم:* ${s.full_name}\n   *الرقم الجامعي:* \`${s.student_number}\`\n   *القسم:* ${s.departments?.name || '-'}\n\n`;
+              responseMsg += `${index + 1}. <b>الاسم:</b> ${s.full_name}\n   <b>الرقم الجامعي:</b> <code>${s.student_number}</code>\n   <b>القسم:</b> ${s.departments?.name || '-'}\n\n`;
             });
-            responseMsg += `⚠️ يرجى إعادة إرسال اسمك الثلاثي الكامل بدقة، أو إرسال *الرقم الجامعي* المكتوب أمام اسمك للحصول على بطاقتك الخاصة.`;
+            responseMsg += `⚠️ يرجى إعادة إرسال اسمك الثلاثي الكامل بدقة، أو إرسال <b>الرقم الجامعي</b> المكتوب أمام اسمك للحصول على بطاقتك الخاصة.`;
             
-            await bot.sendMessage(chatId, responseMsg, { parse_mode: 'Markdown' });
+            await bot.sendMessage(chatId, responseMsg, { parse_mode: 'HTML' });
             return;
           }
         }
