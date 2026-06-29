@@ -126,6 +126,25 @@ export default function CollegeAdminStudents() {
     }
   };
 
+  // Generate random unique 6-digit student number
+  const generateUniqueStudentNumber = async (collegeId) => {
+    let isUnique = false;
+    let code = '';
+    while (!isUnique) {
+      code = String(Math.floor(100000 + Math.random() * 900000));
+      const { data, error } = await supabase
+        .from('students')
+        .select('id')
+        .eq('student_number', code)
+        .eq('college_id', collegeId)
+        .maybeSingle();
+      if (!error && !data) {
+        isUnique = true;
+      }
+    }
+    return code;
+  };
+
   // Add individual student
   const handleCreateStudent = async (e) => {
     e.preventDefault();
@@ -134,6 +153,11 @@ export default function CollegeAdminStudents() {
       const qrToken = crypto.randomUUID();
       const studentId = crypto.randomUUID();
       const univName = adminDetails.colleges?.name || 'رقيم حضور';
+
+      let studentNumber = studentForm.student_number?.trim();
+      if (!studentNumber) {
+        studentNumber = await generateUniqueStudentNumber(adminDetails.college_id);
+      }
 
       // 1. Calculate public url for QR
       const path = `${adminDetails.college_id}/${studentId}.png`;
@@ -145,7 +169,7 @@ export default function CollegeAdminStudents() {
         department_id: studentForm.department_id,
         stage_id: studentForm.stage_id,
         full_name: studentForm.name,
-        student_number: studentForm.student_number,
+        student_number: studentNumber,
         qr_token: qrToken,
         qr_image_url: publicUrl,
         study_type: studentForm.study_type
@@ -219,9 +243,28 @@ export default function CollegeAdminStudents() {
     setImportProgress({ current: 0, total: csvPreview.length });
 
     try {
-      const univName = adminDetails.universities?.name || 'جامعة رقيم';
+      const univName = adminDetails.colleges?.university || 'جامعة رقيم';
       const departmentsMap = new Map(departments.map(d => [d.name.trim(), d.id]));
       
+      // جلب كافة أرقام الطلاب الحالية بالكلية لتجنب تكرار الرموز العشوائية
+      const { data: existingNumbers } = await supabase
+        .from('students')
+        .select('student_number')
+        .eq('college_id', adminDetails.college_id);
+      
+      const usedNumbers = new Set(existingNumbers?.map(s => s.student_number) || []);
+
+      const generateUniqueBatchNumber = () => {
+        let code = '';
+        while (true) {
+          code = String(Math.floor(100000 + Math.random() * 900000));
+          if (!usedNumbers.has(code)) {
+            usedNumbers.add(code);
+            return code;
+          }
+        }
+      };
+
       const studentsToInsert = [];
       const dbStages = stages;
 
@@ -235,6 +278,11 @@ export default function CollegeAdminStudents() {
           stage = dbStages[0];
         }
 
+        let studNumber = String(studentRow.student_number || '').trim();
+        if (!studNumber) {
+          studNumber = generateUniqueBatchNumber();
+        }
+
         const path = `${adminDetails.college_id}/${studentId}.png`;
         const { data: { publicUrl } } = supabase.storage.from('qr-cards').getPublicUrl(path);
 
@@ -244,7 +292,7 @@ export default function CollegeAdminStudents() {
           department_id: deptId || departments[0]?.id,
           stage_id: stage?.id,
           full_name: studentRow.full_name.trim(),
-          student_number: studentRow.student_number.trim(),
+          student_number: studNumber,
           qr_token: qrToken,
           qr_image_url: publicUrl,
           study_type: studentRow.study_type === 'مسائي' ? 'مسائي' : 'صباحي'
@@ -621,14 +669,13 @@ export default function CollegeAdminStudents() {
               />
             </div>
             <div className={compStyles.inputGroup}>
-              <label className={compStyles.label}>الرقم الجامعي</label>
+              <label className={compStyles.label}>الرقم الجامعي (اختياري - اترك فارغاً للتوليد التلقائي للرمز)</label>
               <input 
                 type="text" 
-                required
                 className={compStyles.input}
                 value={studentForm.student_number}
                 onChange={e => setStudentForm({ ...studentForm, student_number: e.target.value })}
-                placeholder="2023/CS/0142"
+                placeholder="مثال: 58291 (أو اترك فارغاً للإنشاء التلقائي)"
               />
             </div>
             <div className={compStyles.inputGroup}>
