@@ -55,6 +55,7 @@ async function processResendRequest(request) {
     if (!student.telegram_chat_id) throw new Error('الطالب لم يقم بتسجيل وتفعيل البوت بعد');
 
     // 3. إرسال الكرت كصورة عبر تيليجرام
+    const frontendUrl = process.env.FRONTEND_URL || 'https://raqim-attendance.vercel.app';
     const caption = `
 📥 *إعادة إرسال بطاقة الحضور الرسمية:*
 
@@ -64,6 +65,9 @@ async function processResendRequest(request) {
 *الكلية:* ${student.colleges?.name || 'الكلية'}
 
 تم إرسال هذا الكارت بطلب من إدارة النظام.
+
+📊 *للاستعلام عن نتائج امتحاناتك وتحميل شهادتك الرسمية:*
+[اضغط هنا لفتح بوابة النتائج](${frontendUrl}/results)
 `;
 
     if (student.telegram_file_id) {

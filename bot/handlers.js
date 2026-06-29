@@ -339,7 +339,8 @@ export const handleTextMessage = async (bot, msg) => {
       student.telegram_chat_id = chatId;
     }
 
-    const caption = `✅ *إليك بطاقة الحضور الرسمية الخاصة بك:*\n\n*الاسم:* ${student.full_name}\n*الرقم الجامعي:* ${student.student_number}\n*الجامعة:* ${student.colleges?.university || 'جامعة رقيم'}\n*الكلية:* ${student.colleges?.name || 'الكلية'}\n\n_احفظ هذه الصورة بجهازك لتتمكن من تسجيل حضورك بدون إنترنت بمسحها بواسطة جهاز الأستاذ._`;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://raqim-attendance.vercel.app';
+    const caption = `✅ *إليك بطاقة الحضور الرسمية الخاصة بك:*\n\n*الاسم:* ${student.full_name}\n*الرقم الجامعي:* ${student.student_number}\n*الجامعة:* ${student.colleges?.university || 'جامعة رقيم'}\n*الكلية:* ${student.colleges?.name || 'الكلية'}\n\n_احفظ هذه الصورة بجهازك لتتمكن من تسجيل حضورك بدون إنترنت بمسحها بواسطة جهاز الأستاذ._\n\n📊 *للاستعلام عن نتائج امتحاناتك وتحميل شهادتك الرسمية:*\n[اضغط هنا لفتح بوابة النتائج](${frontendUrl}/results)`;
 
     if (student.telegram_file_id) {
       // إرسال كاش تيليجرام
