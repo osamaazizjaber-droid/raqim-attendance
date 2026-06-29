@@ -107,7 +107,7 @@ export default function CollegeAdminStudents() {
       setLoading(true);
       let query = supabase
         .from('students')
-        .select('*, departments(name), stages(name), universities(name)')
+        .select('*, departments(name), stages(name), colleges(name)')
         .eq('college_id', adminDetails.college_id);
 
       if (selectedDept) query = query.eq('department_id', selectedDept);
@@ -131,15 +131,14 @@ export default function CollegeAdminStudents() {
     try {
       const qrToken = crypto.randomUUID();
       const studentId = crypto.randomUUID();
-      const univName = adminDetails.universities?.name || 'جامعة رقيم';
+      const univName = adminDetails.colleges?.name || 'رقيم حضور';
 
       // 1. Calculate public url for QR
-      const path = `${adminDetails.university_id}/${studentId}.png`;
+      const path = `${adminDetails.college_id}/${studentId}.png`;
       const { data: { publicUrl } } = supabase.storage.from('qr-cards').getPublicUrl(path);
 
       const newStudent = {
         id: studentId,
-        university_id: adminDetails.university_id,
         college_id: adminDetails.college_id,
         department_id: studentForm.department_id,
         stage_id: studentForm.stage_id,
@@ -234,12 +233,11 @@ export default function CollegeAdminStudents() {
           stage = dbStages[0];
         }
 
-        const path = `${adminDetails.university_id}/${studentId}.png`;
+        const path = `${adminDetails.college_id}/${studentId}.png`;
         const { data: { publicUrl } } = supabase.storage.from('qr-cards').getPublicUrl(path);
 
         studentsToInsert.push({
           id: studentId,
-          university_id: adminDetails.university_id,
           college_id: adminDetails.college_id,
           department_id: deptId || departments[0]?.id,
           stage_id: stage?.id,
@@ -313,7 +311,7 @@ export default function CollegeAdminStudents() {
   const handleDeleteStudent = async (student) => {
     if (!window.confirm(`هل أنت متأكد من حذف الطالب "${student.full_name}"؟ سيتم حذف بطاقته وسجل حضوره ودرجاته بالكامل!`)) return;
     try {
-      const path = `${student.university_id}/${student.id}.png`;
+      const path = `${student.college_id}/${student.id}.png`;
       await supabase.storage.from('qr-cards').remove([path]);
 
       const { error } = await supabase.from('students').delete().eq('id', student.id);
@@ -334,7 +332,7 @@ export default function CollegeAdminStudents() {
 
     setLoading(true);
     try {
-      const paths = filteredStudents.map(s => `${s.university_id}/${s.id}.png`);
+      const paths = filteredStudents.map(s => `${s.college_id}/${s.id}.png`);
       const batchSize = 50;
       for (let i = 0; i < paths.length; i += batchSize) {
         const batch = paths.slice(i, i + batchSize);
@@ -359,7 +357,7 @@ export default function CollegeAdminStudents() {
     if (!window.confirm(`هل تريد إلغاء ربط حساب التيليجرام الخاص بالطالب "${student.full_name}" وإعادة توليد بطاقة حضور سحابية عامة له؟`)) return;
     try {
       setLoading(true);
-      const univName = student.universities?.name || 'جامعة رقيم';
+      const univName = student.colleges?.name || 'رقيم حضور';
       const newQrUrl = await generateAndUploadQRCard(student, univName);
 
       const { error } = await supabase

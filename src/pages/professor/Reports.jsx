@@ -92,8 +92,8 @@ export default function ProfessorReports() {
           professors (
             id,
             name,
-            university_id,
-            universities(name)
+            college_id,
+            colleges(name)
           )
         `)
         .eq('professor_id', professor.id)

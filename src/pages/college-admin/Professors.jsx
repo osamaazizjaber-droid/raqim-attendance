@@ -133,7 +133,6 @@ export default function CollegeAdminProfessors() {
         p_password: createForm.password,
         p_name: createForm.name,
         p_role: 'professor',
-        p_university_id: adminDetails.university_id,
         p_college_id: adminDetails.college_id,
         p_subscription_expires_at: createForm.subscription_expires_at
       });

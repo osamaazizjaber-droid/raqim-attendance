@@ -318,17 +318,14 @@ export default function CollegeAdminResults() {
 
     try {
       // جلب بيانات الكلية والجامعة
-      const { data: college } = await supabase
+      const { data: collegeData } = await supabase
         .from('colleges')
-        .select('name')
+        .select('name, university')
         .eq('id', adminDetails.college_id)
         .single();
 
-      const { data: university } = await supabase
-        .from('universities')
-        .select('name')
-        .eq('id', adminDetails.university_id)
-        .single();
+      const college = collegeData;
+      const university = { name: collegeData?.university || 'رقيم حضور' };
 
       const deptName = departments.find(d => d.id === selectedDept);
 
@@ -404,17 +401,14 @@ export default function CollegeAdminResults() {
     try {
       const zip = new JSZip();
       
-      const { data: college } = await supabase
+      const { data: collegeData } = await supabase
         .from('colleges')
-        .select('name')
+        .select('name, university')
         .eq('id', adminDetails.college_id)
         .single();
 
-      const { data: university } = await supabase
-        .from('universities')
-        .select('name')
-        .eq('id', adminDetails.university_id)
-        .single();
+      const college = collegeData;
+      const university = { name: collegeData?.university || 'رقيم حضور' };
 
       const deptName = departments.find(d => d.id === selectedDept);
 
