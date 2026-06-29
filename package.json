@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "start": "cd bot && npm install && node index.js"
+    "start": "cd bot && node index.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
