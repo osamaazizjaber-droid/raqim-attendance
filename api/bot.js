@@ -22,6 +22,16 @@ export default async function handler(req, res) {
       
       const response = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${webhookUrl}`);
       const data = await response.json();
+
+      // تسجيل قائمة الأوامر المعروضة للمستخدم في زر القائمة (Menu Button)
+      try {
+        await bot.setMyCommands([
+          { command: 'start', description: 'البدء وتفعيل الحساب / Start and activate account' },
+          { command: 'help', description: 'عرض تعليمات الاستخدام / Show usage help' }
+        ]);
+      } catch (cmdErr) {
+        console.error('⚠️ Failed to set commands during webhook initialization:', cmdErr);
+      }
       
       return res.status(200).json({
         message: 'تم إعداد وتفعيل الـ Webhook الخاص برقيم بنجاح!',

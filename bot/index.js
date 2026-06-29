@@ -36,6 +36,16 @@ try {
 // تهيئة البوت وتأجيل بدء الاستطلاع لضمان تسجيل المستمعين أولاً
 const bot = new TelegramBot(token);
 
+// تسجيل قائمة الأوامر المعتمدة في تيليجرام لتظهر في زر القائمة (Menu Button)
+bot.setMyCommands([
+  { command: 'start', description: 'البدء وتفعيل الحساب / Start and activate account' },
+  { command: 'help', description: 'عرض تعليمات الاستخدام / Show usage help' }
+]).then(() => {
+  console.log('📌 تم تسجيل قائمة الأوامر (/start, /help) في تيليجرام بنجاح.');
+}).catch((err) => {
+  console.error('⚠️ فشل تسجيل قائمة الأوامر في تيليجرام:', err.message || err);
+});
+
 // تسجيل مستمع لأخطاء الاستطلاع لتجنب توقف البوت
 bot.on('polling_error', (error) => {
   console.error('⚠️ Polling error:', error.message || error);
