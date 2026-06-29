@@ -29,7 +29,7 @@ export default function SuperAdminColleges() {
   const [collegeForm, setCollegeForm] = useState({
     id: null,
     name: '',
-    city: '',
+    university: '',
     subscription_expires_at: ''
   });
 
@@ -99,7 +99,7 @@ export default function SuperAdminColleges() {
           .from('colleges')
           .update({ 
             name: collegeForm.name, 
-            city: collegeForm.city, 
+            university: collegeForm.university, 
             subscription_expires_at: collegeForm.subscription_expires_at 
           })
           .eq('id', collegeForm.id);
@@ -111,14 +111,14 @@ export default function SuperAdminColleges() {
           .from('colleges')
           .insert({ 
             name: collegeForm.name, 
-            city: collegeForm.city, 
+            university: collegeForm.university, 
             subscription_expires_at: collegeForm.subscription_expires_at || new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]
           });
         if (error) throw error;
         showToast('نجاح', 'تم إضافة الكلية بنجاح', 'success');
       }
       setIsCollegeModalOpen(false);
-      setCollegeForm({ id: null, name: '', city: '', subscription_expires_at: '' });
+      setCollegeForm({ id: null, name: '', university: '', subscription_expires_at: '' });
       fetchColleges();
     } catch (err) {
       showToast('خطأ', err.message || 'فشل حفظ الكلية', 'danger');
@@ -217,7 +217,7 @@ export default function SuperAdminColleges() {
                     <thead>
                       <Tr>
                         <Th>اسم الكلية</Th>
-                        <Th>المحافظة/المدينة</Th>
+                        <Th>الجامعة</Th>
                         <Th>تاريخ انتهاء الاشتراك</Th>
                         <Th>حالة الاشتراك</Th>
                         <Th>العمليات</Th>
@@ -232,7 +232,7 @@ export default function SuperAdminColleges() {
                           style={{ cursor: 'pointer' }}
                         >
                           <Td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{col.name}</Td>
-                          <Td>{col.city || '-'}</Td>
+                          <Td>{col.university || '-'}</Td>
                           <Td>{col.subscription_expires_at}</Td>
                           <Td>
                             {isCollegeExpired(col.subscription_expires_at) ? (
@@ -250,7 +250,7 @@ export default function SuperAdminColleges() {
                                   setCollegeForm({
                                     id: col.id,
                                     name: col.name,
-                                    city: col.city || '',
+                                    university: col.university || '',
                                     subscription_expires_at: col.subscription_expires_at
                                   });
                                   setIsCollegeModalOpen(true);
@@ -333,7 +333,7 @@ export default function SuperAdminColleges() {
           isOpen={isCollegeModalOpen} 
           onClose={() => {
             setIsCollegeModalOpen(false);
-            setCollegeForm({ id: null, name: '', city: '', subscription_expires_at: '' });
+            setCollegeForm({ id: null, name: '', university: '', subscription_expires_at: '' });
           }} 
           title={collegeForm.id ? "تعديل بيانات الكلية الجامعية" : "إضافة كلية جامعية جديدة"}
         >
@@ -350,13 +350,13 @@ export default function SuperAdminColleges() {
               />
             </div>
             <div className={compStyles.inputGroup}>
-              <label className={compStyles.label}>المدينة/المحافظة</label>
+              <label className={compStyles.label}>الجامعة التابعة لها</label>
               <input 
                 type="text" 
                 className={compStyles.input}
-                value={collegeForm.city}
-                onChange={e => setCollegeForm({ ...collegeForm, city: e.target.value })}
-                placeholder="بغداد"
+                value={collegeForm.university}
+                onChange={e => setCollegeForm({ ...collegeForm, university: e.target.value })}
+                placeholder="مثال: جامعة تكريت"
               />
             </div>
             <div className={compStyles.inputGroup}>

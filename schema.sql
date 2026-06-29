@@ -41,7 +41,7 @@ INSERT INTO system_admins (email) VALUES ('osamaazizjaber@gmail.com') ON CONFLIC
 CREATE TABLE colleges (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
-    city text,
+    university text,
     subscription_expires_at date NOT NULL DEFAULT (now() + interval '1 year')::date,
     created_at timestamptz DEFAULT now()
 );
