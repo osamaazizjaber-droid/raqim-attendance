@@ -257,7 +257,7 @@ export const handleTextMessage = async (bot, msg) => {
 
     const { data: student, error: studErr } = await supabase
       .from('students')
-      .select('*, universities(name)')
+      .select('*, colleges(name, university)')
       .eq('student_number', studentNumber)
       .maybeSingle();
 
@@ -277,7 +277,7 @@ export const handleTextMessage = async (bot, msg) => {
       student.telegram_chat_id = chatId;
     }
 
-    const caption = `✅ *إليك بطاقة الحضور الرسمية الخاصة بك:*\n\n*الاسم:* ${student.full_name}\n*الرقم الجامعي:* ${student.student_number}\n*الجامعة:* ${student.universities?.name || 'جامعة رقيم'}\n\n_احفظ هذه الصورة بجهازك لتتمكن من تسجيل حضورك بدون إنترنت بمسحها بواسطة جهاز الأستاذ._`;
+    const caption = `✅ *إليك بطاقة الحضور الرسمية الخاصة بك:*\n\n*الاسم:* ${student.full_name}\n*الرقم الجامعي:* ${student.student_number}\n*الجامعة:* ${student.colleges?.university || 'جامعة رقيم'}\n*الكلية:* ${student.colleges?.name || 'الكلية'}\n\n_احفظ هذه الصورة بجهازك لتتمكن من تسجيل حضورك بدون إنترنت بمسحها بواسطة جهاز الأستاذ._`;
 
     if (student.telegram_file_id) {
       // إرسال كاش تيليجرام

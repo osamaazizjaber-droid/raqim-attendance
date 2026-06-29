@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Key, Users, GraduationCap, Download, Upload, RefreshCw, XCircle, BookOpen, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Key, Users, GraduationCap, Download, Upload, RefreshCw, XCircle, BookOpen, AlertCircle, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../components/ui/Toast';
 import { Button } from '../../components/ui/Button';
@@ -34,6 +34,7 @@ export default function CollegeAdminStudents() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isCoursesModalOpen, setIsCoursesModalOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   // Forms
   const [studentForm, setStudentForm] = useState({ name: '', student_number: '', department_id: '', stage_id: '', study_type: 'صباحي' });
@@ -325,6 +326,11 @@ export default function CollegeAdminStudents() {
     }
   };
 
+  const handleViewQrCard = (student) => {
+    setActiveStudent(student);
+    setIsQrModalOpen(true);
+  };
+
   // Delete all filtered students
   const handleDeleteAllStudents = async () => {
     if (filteredStudents.length === 0) return;
@@ -577,6 +583,9 @@ export default function CollegeAdminStudents() {
                     </Td>
                     <Td>
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <Button size="icon" variant="secondary" onClick={() => handleViewQrCard(student)} title="عرض وتنزيل بطاقة الـ QR">
+                          <Eye size={14} />
+                        </Button>
                         <Button size="sm" variant="secondary" onClick={() => openStudentCourses(student)}>
                           <BookOpen size={14} />
                           <span>المواد</span>
@@ -852,6 +861,54 @@ export default function CollegeAdminStudents() {
               <Button variant="secondary" onClick={() => setIsCoursesModalOpen(false)}>إغلاق النافذة</Button>
             </div>
           </div>
+        </Modal>
+
+        {/* مودال عرض بطاقة الـ QR */}
+        <Modal 
+          isOpen={isQrModalOpen} 
+          onClose={() => setIsQrModalOpen(false)} 
+          title={`بطاقة الحضور: ${activeStudent?.full_name || ''}`}
+        >
+          {activeStudent?.qr_image_url ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', padding: '1rem' }}>
+              <img 
+                src={activeStudent.qr_image_url} 
+                alt="QR Attendance Card" 
+                style={{ 
+                  width: '100%', 
+                  maxWidth: '350px', 
+                  borderRadius: 'var(--radius-md)', 
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                  border: '1px solid var(--border)' 
+                }} 
+              />
+              <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                <Button 
+                  variant="secondary" 
+                  onClick={() => setIsQrModalOpen(false)}
+                  style={{ flex: 1 }}
+                >
+                  إغلاق
+                </Button>
+                <a 
+                  href={activeStudent.qr_image_url} 
+                  download={`${activeStudent.full_name.replace(/\s+/g, '_')}_QR.png`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ flex: 1, textDecoration: 'none' }}
+                >
+                  <Button style={{ width: '100%' }}>
+                    <Download size={16} />
+                    <span>تحميل الكارت</span>
+                  </Button>
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+              لم يتم توليد بطاقة الحضور لهذا الطالب بعد.
+            </div>
+          )}
         </Modal>
       </div>
     </div>

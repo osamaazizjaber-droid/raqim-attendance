@@ -46,7 +46,7 @@ async function processResendRequest(request) {
     // 2. جلب بيانات الطالب وجامعته
     const { data: student, error: studErr } = await supabase
       .from('students')
-      .select('*, universities(name)')
+      .select('*, colleges(name, university)')
       .eq('id', studentId)
       .single();
 
@@ -60,7 +60,8 @@ async function processResendRequest(request) {
 
 *الاسم:* ${student.full_name}
 *الرقم الجامعي:* ${student.student_number}
-*الجامعة:* ${student.universities?.name || 'جامعة رقيم'}
+*الجامعة:* ${student.colleges?.university || 'جامعة رقيم'}
+*الكلية:* ${student.colleges?.name || 'الكلية'}
 
 تم إرسال هذا الكارت بطلب من إدارة النظام.
 `;
