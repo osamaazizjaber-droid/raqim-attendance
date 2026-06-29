@@ -49,7 +49,7 @@ export default function CollegeAdminResults() {
   const [genProgress, setGenProgress] = useState({ current: 0, total: 0 });
 
   // Edit / Form states
-  const [editForm, setEditForm] = useState({ id: null, score: '', grade_label: '' });
+  const [editForm, setEditForm] = useState({ id: null, score: '', grade_label: '', student_name: '', course_name: '' });
 
   // Academic years list helper
   const academicYears = ['2023/2024', '2024/2025', '2025/2026', '2026/2027'];
@@ -167,26 +167,37 @@ export default function CollegeAdminResults() {
       const resultsToInsert = [];
 
       resultsPreview.forEach((row, idx) => {
-        const studNum = String(row.student_number).trim();
-        const courseName = String(row.course_name).trim().toLowerCase();
-        const score = parseFloat(row.score);
+        const studNum = String(row.student_number || '').trim();
+        const courseName = String(row.course_name || '').trim().toLowerCase();
+        
+        let score = parseFloat(row.score);
+        let gradeLabel = String(row.grade_label || row['التقدير'] || row['grade'] || '').trim();
         const year = String(row.academic_year || selectedYear).trim();
 
         const studentId = studentsMap.get(studNum);
         const courseId = coursesMap.get(courseName);
 
-        if (!studentId) {
-          console.warn(`الرقم الجامعي ${studNum} غير مسجل بالكلية.`);
-          return;
-        }
-        if (!courseId) {
-          console.warn(`المادة ${courseName} غير مسجلة بالقسم.`);
-          return;
-        }
+        if (!studentId || !courseId) return;
 
-        // احتساب تقدير الدرجة
-        const scale = gradeScales.find(s => score >= s.min_score && score <= s.max_score);
-        const gradeLabel = scale ? scale.label : 'مقبول';
+        // إذا كانت الدرجة فارغة أو غير رقمية، ولكن التقدير موجود
+        if (isNaN(score) && gradeLabel) {
+          const defaultScores = {
+            'امتياز': 95,
+            'جيد جداً': 85,
+            'جيد': 75,
+            'متوسط': 65,
+            'مقبول': 55,
+            'ضعيف': 45
+          };
+          score = defaultScores[gradeLabel] || 55; // افتراض مقبول (55)
+        } else if (!isNaN(score) && !gradeLabel) {
+          // احتساب تقدير الدرجة تلقائياً
+          const scale = gradeScales.find(s => score >= s.min_score && score <= s.max_score);
+          gradeLabel = scale ? scale.label : 'مقبول';
+        } else if (isNaN(score) && !gradeLabel) {
+          // كلاهما فارغ
+          return;
+        }
 
         resultsToInsert.push({
           student_id: studentId,
@@ -220,11 +231,47 @@ export default function CollegeAdminResults() {
     }
   };
 
+  const handleGradeSelectChange = (e) => {
+    const label = e.target.value;
+    if (!label) return;
+    
+    const defaultScores = {
+      'امتياز': 95,
+      'جيد جداً': 85,
+      'جيد': 75,
+      'متوسط': 65,
+      'مقبول': 55,
+      'ضعيف': 45
+    };
+    setEditForm(prev => ({
+      ...prev,
+      grade_label: label,
+      score: defaultScores[label] || prev.score
+    }));
+  };
+
+  const handleScoreChange = (e) => {
+    const scoreVal = e.target.value;
+    const scoreNum = parseFloat(scoreVal);
+    let label = editForm.grade_label;
+    if (!isNaN(scoreNum)) {
+      const scale = gradeScales.find(s => scoreNum >= s.min_score && scoreNum <= s.max_score);
+      if (scale) label = scale.label;
+    }
+    setEditForm(prev => ({
+      ...prev,
+      score: scoreVal,
+      grade_label: label
+    }));
+  };
+
   const handleEditResult = (res) => {
     setEditForm({
       id: res.id,
       score: res.score,
-      grade_label: res.grade_label
+      grade_label: res.grade_label,
+      student_name: res.students?.full_name,
+      course_name: res.courses?.name
     });
     setIsEditModalOpen(true);
   };
@@ -687,10 +734,51 @@ export default function CollegeAdminResults() {
         </Modal>
 
         {/* مودال تعديل النتيجة الفردية */}
-        <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="تعديل درجة الطالب">
+        <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="تعديل درجة وتقدير الطالب">
           <form onSubmit={saveEditedResult} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            
+            {/* معلومات الطالب والمادة */}
+            <div style={{ 
+              backgroundColor: 'var(--bg-secondary)', 
+              padding: '1rem', 
+              borderRadius: 'var(--radius-md)', 
+              border: '1px solid var(--border)', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '0.5rem' 
+            }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>اسم الطالب: </span>
+                <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>{editForm.student_name}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>المادة الدراسية: </span>
+                <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>{editForm.course_name}</strong>
+              </div>
+            </div>
+
+            {/* تحديد التقدير مباشرة */}
             <div className={compStyles.inputGroup}>
-              <label className={compStyles.label}>الدرجة (من 0 إلى 100)</label>
+              <label className={compStyles.label}>التقدير العام</label>
+              <select 
+                className={compStyles.input}
+                value={editForm.grade_label}
+                onChange={handleGradeSelectChange}
+                required
+              >
+                <option value="">اختر التقدير...</option>
+                <option value="امتياز">امتياز (90 - 100)</option>
+                <option value="جيد جداً">جيد جداً (80 - 89)</option>
+                <option value="جيد">جيد (70 - 79)</option>
+                <option value="متوسط">متوسط (60 - 69)</option>
+                <option value="مقبول">مقبول (50 - 59)</option>
+                <option value="ضعيف">ضعيف (0 - 49)</option>
+              </select>
+            </div>
+
+            {/* الدرجة الرقمية (تتحدث تلقائياً) */}
+            <div className={compStyles.inputGroup}>
+              <label className={compStyles.label}>الدرجة الرقمية (من 0 إلى 100)</label>
               <input 
                 type="number" 
                 step="0.1"
@@ -699,12 +787,17 @@ export default function CollegeAdminResults() {
                 required
                 className={compStyles.input}
                 value={editForm.score}
-                onChange={e => setEditForm({ ...editForm, score: e.target.value })}
+                onChange={handleScoreChange}
+                placeholder="سيتم تعيين درجة تلقائية عند اختيار التقدير"
               />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                * يمكنك إدخال درجة مخصصة أو الاعتماد على الدرجة التلقائية للتقدير المختار.
+              </span>
             </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
               <Button type="button" variant="secondary" onClick={() => setIsEditModalOpen(false)}>إلغاء</Button>
-              <Button type="submit">تحديث الدرجة</Button>
+              <Button type="submit">حفظ التغييرات</Button>
             </div>
           </form>
         </Modal>
