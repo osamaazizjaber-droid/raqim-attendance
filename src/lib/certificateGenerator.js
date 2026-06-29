@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 // دالة لجلب خط Amiri العربي وتحويله إلى Base64 في المتصفح ديناميكياً لتفادي تضخيم حجم الكود
 let cachedFontBase64 = null;
@@ -103,7 +103,7 @@ export const generateCertificatePDF = async ({
     const headRow = firstFive.map(r => `${r.courses?.name || 'مادة'}\n(وحدات: ${r.courses?.units || 1})`);
     const bodyRow = firstFive.map(r => r.grade_label);
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: 76,
       head: [headRow],
       body: [bodyRow],
@@ -129,7 +129,7 @@ export const generateCertificatePDF = async ({
     const headRow2 = secondFive.map(r => `${r.courses?.name || 'مادة'}\n(وحدات: ${r.courses?.units || 1})`);
     const bodyRow2 = secondFive.map(r => r.grade_label);
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 4,
       head: [headRow2],
       body: [bodyRow2],
