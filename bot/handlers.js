@@ -250,45 +250,58 @@ export const handleTextMessage = async (bot, msg) => {
       return;
     }
 
-    // 3. المعاملة الافتراضية: البحث كـ رقم جامعي للحصول على بطاقة الـ QR للطالب
+    // 3. المعاملة الافتراضية: الحصول على بطاقة الـ QR للطالب
     await bot.sendChatAction(chatId, 'upload_photo');
 
     const searchText = text.trim();
     let student = null;
 
-    // 1. محاولة البحث أولاً بمطابقة الرقم الجامعي بدقة
-    const { data: studentByNum, error: numErr } = await supabase
+    // 0. التحقق أولاً مما إذا كان حساب التيليجرام هذا مرتبطاً بالفعل بطالب مسجل
+    const { data: linkedStudent, error: linkedErr } = await supabase
       .from('students')
       .select('*, colleges(name, university), departments(name)')
-      .eq('student_number', searchText)
+      .eq('telegram_chat_id', chatId)
       .maybeSingle();
 
-    if (numErr) throw numErr;
+    if (linkedErr) throw linkedErr;
 
-    if (studentByNum) {
-      student = studentByNum;
+    if (linkedStudent) {
+      student = linkedStudent;
     } else {
-      // 2. إذا لم يعثر عليه بالرقم، نبحث بالاسم الثلاثي (بحث جزئي ذكي)
-      const { data: studentsByName, error: nameErr } = await supabase
+      // 1. محاولة البحث أولاً بمطابقة الرقم الجامعي بدقة
+      const { data: studentByNum, error: numErr } = await supabase
         .from('students')
         .select('*, colleges(name, university), departments(name)')
-        .ilike('full_name', `%${searchText}%`);
+        .eq('student_number', searchText)
+        .maybeSingle();
 
-      if (nameErr) throw nameErr;
+      if (numErr) throw numErr;
 
-      if (studentsByName && studentsByName.length > 0) {
-        if (studentsByName.length === 1) {
-          student = studentsByName[0];
-        } else {
-          // وجد أكثر من طالب بنفس الاسم
-          let responseMsg = `🔍 *تم العثور على أكثر من طالب يطابق هذا الاسم:*\n\n`;
-          studentsByName.slice(0, 5).forEach((s, index) => {
-            responseMsg += `${index + 1}. *الاسم:* ${s.full_name}\n   *الرقم الجامعي:* \`${s.student_number}\`\n   *القسم:* ${s.departments?.name || '-'}\n\n`;
-          });
-          responseMsg += `⚠️ يرجى إعادة إرسال اسمك الثلاثي الكامل بدقة، أو إرسال *الرقم الجامعي* المكتوب أمام اسمك للحصول على بطاقتك الخاصة.`;
-          
-          await bot.sendMessage(chatId, responseMsg, { parse_mode: 'Markdown' });
-          return;
+      if (studentByNum) {
+        student = studentByNum;
+      } else {
+        // 2. إذا لم يعثر عليه بالرقم، نبحث بالاسم الثلاثي (بحث جزئي ذكي)
+        const { data: studentsByName, error: nameErr } = await supabase
+          .from('students')
+          .select('*, colleges(name, university), departments(name)')
+          .ilike('full_name', `%${searchText}%`);
+
+        if (nameErr) throw nameErr;
+
+        if (studentsByName && studentsByName.length > 0) {
+          if (studentsByName.length === 1) {
+            student = studentsByName[0];
+          } else {
+            // وجد أكثر من طالب بنفس الاسم
+            let responseMsg = `🔍 *تم العثور على أكثر من طالب يطابق هذا الاسم:*\n\n`;
+            studentsByName.slice(0, 5).forEach((s, index) => {
+              responseMsg += `${index + 1}. *الاسم:* ${s.full_name}\n   *الرقم الجامعي:* \`${s.student_number}\`\n   *القسم:* ${s.departments?.name || '-'}\n\n`;
+            });
+            responseMsg += `⚠️ يرجى إعادة إرسال اسمك الثلاثي الكامل بدقة، أو إرسال *الرقم الجامعي* المكتوب أمام اسمك للحصول على بطاقتك الخاصة.`;
+            
+            await bot.sendMessage(chatId, responseMsg, { parse_mode: 'Markdown' });
+            return;
+          }
         }
       }
     }
