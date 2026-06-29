@@ -18,6 +18,11 @@ if (!token) {
 // تهيئة البوت في وضع الاستطلاع النشط (Polling Mode)
 const bot = new TelegramBot(token, { polling: true });
 
+// تسجيل مستمع لأخطاء الاستطلاع لتجنب توقف البوت
+bot.on('polling_error', (error) => {
+  console.error('⚠️ Polling error:', error.message || error);
+});
+
 console.log('🤖 بوت رقيم لتيليجرام يعمل الآن بنجاح...');
 
 // تسجيل المستمعين لأوامر البوت والرسائل

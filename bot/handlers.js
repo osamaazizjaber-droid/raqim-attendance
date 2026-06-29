@@ -191,6 +191,10 @@ export const handleTextMessage = async (bot, msg) => {
 
   } catch (err) {
     console.error('Error handling telegram message:', err);
-    await bot.sendMessage(chatId, '⚠️ حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى لاحقاً.');
+    try {
+      await bot.sendMessage(chatId, '⚠️ حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى لاحقاً.');
+    } catch (sendErr) {
+      console.error('Failed to send error fallback message to user:', sendErr.message || sendErr);
+    }
   }
 };
