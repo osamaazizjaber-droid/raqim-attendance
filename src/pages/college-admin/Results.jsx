@@ -457,6 +457,25 @@ export default function CollegeAdminResults() {
     }
   };
 
+  // دالة لتحميل نموذج ملف كشف الدرجات بصيغة CSV تدعم الترميز العربي بترميز UTF-8 BOM
+  const downloadTemplate = () => {
+    const csvContent = 'student_number,course_name,score,academic_year\n' +
+      '2023/CS/0142,هياكل البيانات,85.5,2024/2025\n' +
+      '2023/CS/0143,هياكل البيانات,45.0,2024/2025\n' +
+      '2023/CS/0144,الذكاء الاصطناعي,92.0,2024/2025\n' +
+      '2023/CS/0145,شبكات الحاسوب,73.5,2024/2025\n';
+    
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'نموذج_درجات_رقيم.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Filter local search list
   const filteredResults = results.filter(r => {
     const term = searchQuery.toLowerCase();
@@ -658,11 +677,17 @@ export default function CollegeAdminResults() {
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-              <Button variant="secondary" onClick={() => { setIsUploadModalOpen(false); setResultsPreview([]); }} disabled={isUploading}>إلغاء</Button>
-              <Button onClick={executeUpload} disabled={resultsPreview.length === 0 || isUploading}>
-                <span>بدء الرفع والاحتساب</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '1rem', width: '100%' }}>
+              <Button variant="secondary" onClick={downloadTemplate} style={{ marginLeft: 'auto' }}>
+                <Download size={16} />
+                <span>تحميل النموذج التجريبي (CSV)</span>
               </Button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <Button variant="secondary" onClick={() => { setIsUploadModalOpen(false); setResultsPreview([]); }} disabled={isUploading}>إلغاء</Button>
+                <Button onClick={executeUpload} disabled={resultsPreview.length === 0 || isUploading}>
+                  <span>بدء الرفع والاحتساب</span>
+                </Button>
+              </div>
             </div>
           </div>
         </Modal>
