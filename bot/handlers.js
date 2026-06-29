@@ -253,18 +253,48 @@ export const handleTextMessage = async (bot, msg) => {
     // 3. المعاملة الافتراضية: البحث كـ رقم جامعي للحصول على بطاقة الـ QR للطالب
     await bot.sendChatAction(chatId, 'upload_photo');
 
-    const studentNumber = text;
+    const searchText = text.trim();
+    let student = null;
 
-    const { data: student, error: studErr } = await supabase
+    // 1. محاولة البحث أولاً بمطابقة الرقم الجامعي بدقة
+    const { data: studentByNum, error: numErr } = await supabase
       .from('students')
-      .select('*, colleges(name, university)')
-      .eq('student_number', studentNumber)
+      .select('*, colleges(name, university), departments(name)')
+      .eq('student_number', searchText)
       .maybeSingle();
 
-    if (studErr) throw studErr;
+    if (numErr) throw numErr;
+
+    if (studentByNum) {
+      student = studentByNum;
+    } else {
+      // 2. إذا لم يعثر عليه بالرقم، نبحث بالاسم الثلاثي (بحث جزئي ذكي)
+      const { data: studentsByName, error: nameErr } = await supabase
+        .from('students')
+        .select('*, colleges(name, university), departments(name)')
+        .ilike('full_name', `%${searchText}%`);
+
+      if (nameErr) throw nameErr;
+
+      if (studentsByName && studentsByName.length > 0) {
+        if (studentsByName.length === 1) {
+          student = studentsByName[0];
+        } else {
+          // وجد أكثر من طالب بنفس الاسم
+          let responseMsg = `🔍 *تم العثور على أكثر من طالب يطابق هذا الاسم:*\n\n`;
+          studentsByName.slice(0, 5).forEach((s, index) => {
+            responseMsg += `${index + 1}. *الاسم:* ${s.full_name}\n   *الرقم الجامعي:* \`${s.student_number}\`\n   *القسم:* ${s.departments?.name || '-'}\n\n`;
+          });
+          responseMsg += `⚠️ يرجى إعادة إرسال اسمك الثلاثي الكامل بدقة، أو إرسال *الرقم الجامعي* المكتوب أمام اسمك للحصول على بطاقتك الخاصة.`;
+          
+          await bot.sendMessage(chatId, responseMsg, { parse_mode: 'Markdown' });
+          return;
+        }
+      }
+    }
 
     if (!student) {
-      await bot.sendMessage(chatId, '❌ الرقم الجامعي غير موجود، يرجى التأكد منه أو التواصل مع إدارة التسجيل والقبول بكليتك.');
+      await bot.sendMessage(chatId, '❌ لم يتم العثور على أي طالب يطابق هذا الاسم أو الرقم الجامعي. يرجى كتابة الاسم الثلاثي الكامل بشكل صحيح، أو إدخال الرقم الجامعي كما هو مسجل بالكلية.');
       return;
     }
 
