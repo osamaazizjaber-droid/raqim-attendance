@@ -102,7 +102,7 @@ export default function ResultsLookup() {
       const college = { name: studentData?.colleges?.name || 'الكلية' };
       const department = { name: studentData?.departments?.name || 'القسم' };
 
-      const pdfDoc = await generateCertificatePDF({
+      const pdfBlob = await generateCertificatePDF({
         student: studentData,
         results,
         overallGrade,
@@ -113,7 +113,14 @@ export default function ResultsLookup() {
         department
       });
 
-      pdfDoc.save(`${studentData.full_name.replace(/\s+/g, '_')}_شهادة.pdf`);
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${studentData.full_name.replace(/\s+/g, '_')}_شهادة.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء توليد وتحميل الشهادة.');
