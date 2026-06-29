@@ -319,25 +319,7 @@ export const generateCertificatePDF = async ({
       const overallColor = colorsMap[overallGrade] || '#475569';
       drawAlignedRow('التقدير العام للمعدل', overallGrade, overallColor, finalY + 75);
 
-      // 7. التواقيع مع خطوط فاصلة أنيقة
-      ctx.strokeStyle = '#94A3B8';
-      ctx.lineWidth = 2;
-      
-      ctx.beginPath();
-      ctx.moveTo(1950, finalY + 110);
-      ctx.lineTo(2350, finalY + 110);
-      ctx.stroke();
 
-      ctx.beginPath();
-      ctx.moveTo(600, finalY + 110);
-      ctx.lineTo(1000, finalY + 110);
-      ctx.stroke();
-
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#1E293B';
-      ctx.font = 'bold 30px Tajawal, Arial, sans-serif';
-      ctx.fillText('توقيع رئيس القسم', 2150, finalY + 160);
-      ctx.fillText('توقيع عميد الكلية', 800, finalY + 160);
 
       // 8. تحويل الكانفاس إلى صورة ودمجها بملف PDF
       const imgData = canvas.toDataURL('image/png');
