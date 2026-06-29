@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit, Building, UserPlus, Users } from 'lucide-react';
+import { Plus, Trash2, Key, Building, Calendar, Users, ShieldAlert } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../components/ui/Toast';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { Badge } from '../../components/ui/Badge';
 import { Table, Tr, Th, Td } from '../../components/ui/Table';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { UniversityAdminSidebar } from './Dashboard';
+import { SuperAdminSidebar } from './Dashboard';
 import styles from '../../styles/admin.module.css';
 import compStyles from '../../styles/components.module.css';
-import { useAuth } from '../../hooks/useAuth';
 
-export default function UniversityAdminColleges() {
+export default function SuperAdminColleges() {
   const { showToast } = useToast();
-  const { adminDetails } = useAuth();
 
   // States
   const [colleges, setColleges] = useState([]);
@@ -22,27 +21,27 @@ export default function UniversityAdminColleges() {
   const [loading, setLoading] = useState(true);
   const [adminsLoading, setAdminsLoading] = useState(false);
 
-  // Modals state
+  // Modals
   const [isCollegeModalOpen, setIsCollegeModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
-  // Form inputs
-  const [collegeForm, setCollegeForm] = useState({ id: null, name: '' });
-  const [adminForm, setAdminForm] = useState({ name: '', email: '', password: '' });
+  // Forms
+  const [collegeForm, setCollegeForm] = useState({
+    id: null,
+    name: '',
+    city: '',
+    subscription_expires_at: ''
+  });
+
+  const [adminForm, setAdminForm] = useState({
+    name: '',
+    email: '',
+    password: ''
+  });
 
   useEffect(() => {
-    if (adminDetails?.university_id) {
-      fetchColleges();
-    }
-  }, [adminDetails]);
-
-  useEffect(() => {
-    if (selectedCollege) {
-      fetchCollegeAdmins(selectedCollege.id);
-    } else {
-      setAdmins([]);
-    }
-  }, [selectedCollege]);
+    fetchColleges();
+  }, []);
 
   const fetchColleges = async () => {
     try {
@@ -50,7 +49,6 @@ export default function UniversityAdminColleges() {
       const { data, error } = await supabase
         .from('colleges')
         .select('*')
-        .eq('university_id', adminDetails.university_id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -58,9 +56,10 @@ export default function UniversityAdminColleges() {
 
       if (data && data.length > 0) {
         setSelectedCollege(data[0]);
+        await fetchCollegeAdmins(data[0].id);
       }
     } catch (err) {
-      showToast('خطأ', 'حدث خطأ أثناء تحميل الكليات', 'danger');
+      showToast('خطأ', 'فشل تحميل بيانات الكليات الجامعية', 'danger');
     } finally {
       setLoading(false);
     }
@@ -85,6 +84,11 @@ export default function UniversityAdminColleges() {
     }
   };
 
+  const handleCollegeSelect = async (college) => {
+    setSelectedCollege(college);
+    await fetchCollegeAdmins(college.id);
+  };
+
   // College CRUD
   const saveCollege = async (e) => {
     e.preventDefault();
@@ -93,23 +97,28 @@ export default function UniversityAdminColleges() {
         // Edit
         const { error } = await supabase
           .from('colleges')
-          .update({ name: collegeForm.name })
+          .update({ 
+            name: collegeForm.name, 
+            city: collegeForm.city, 
+            subscription_expires_at: collegeForm.subscription_expires_at 
+          })
           .eq('id', collegeForm.id);
         if (error) throw error;
-        showToast('نجاح', 'تم تحديث اسم الكلية بنجاح', 'success');
+        showToast('نجاح', 'تم تحديث بيانات الكلية بنجاح', 'success');
       } else {
         // Create
         const { error } = await supabase
           .from('colleges')
           .insert({ 
             name: collegeForm.name, 
-            university_id: adminDetails.university_id
+            city: collegeForm.city, 
+            subscription_expires_at: collegeForm.subscription_expires_at || new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]
           });
         if (error) throw error;
         showToast('نجاح', 'تم إضافة الكلية بنجاح', 'success');
       }
       setIsCollegeModalOpen(false);
-      setCollegeForm({ id: null, name: '' });
+      setCollegeForm({ id: null, name: '', city: '', subscription_expires_at: '' });
       fetchColleges();
     } catch (err) {
       showToast('خطأ', err.message || 'فشل حفظ الكلية', 'danger');
@@ -117,7 +126,7 @@ export default function UniversityAdminColleges() {
   };
 
   const deleteCollege = async (id, name) => {
-    if (!window.confirm(`هل أنت متأكد من حذف كلية "${name}"؟ سيتم حذف جميع الأقسام والمواد والأساتذة والطلاب وسجلات الحضور التابعة لها نهائياً!`)) return;
+    if (!window.confirm(`هل أنت متأكد من حذف كلية "${name}"؟ سيتم حذف جميع الأقسام والأساتذة والطلاب وسجلات حضورهم نهائياً!`)) return;
     try {
       const { error } = await supabase.from('colleges').delete().eq('id', id);
       if (error) throw error;
@@ -128,18 +137,17 @@ export default function UniversityAdminColleges() {
     }
   };
 
-  // Create College Admin Request
+  // Create College Admin Directly (RPC)
   const createCollegeAdmin = async (e) => {
     e.preventDefault();
     if (!selectedCollege) return;
-    setLoading(true);
+    setAdminsLoading(true);
     try {
       const { data, error } = await supabase.rpc('create_new_user', {
         p_email: adminForm.email,
         p_password: adminForm.password,
         p_name: adminForm.name,
         p_role: 'college',
-        p_university_id: adminDetails.university_id,
         p_college_id: selectedCollege.id,
         p_subscription_expires_at: null
       });
@@ -152,39 +160,40 @@ export default function UniversityAdminColleges() {
     } catch (err) {
       showToast('خطأ في الإنشاء', err.message || 'فشل إنشاء حساب مدير الكلية', 'danger');
     } finally {
-      setLoading(false);
+      setAdminsLoading(false);
     }
   };
 
   const deleteAdmin = async (adminId, adminName) => {
     if (!window.confirm(`هل أنت متأكد من حذف حساب مدير الكلية "${adminName}"؟`)) return;
     try {
+      // 1. حذف حساب Auth عن طريق الاتصال بمشرف سوبابيس (من خلال cascade عند حذف السجل في جدول admins)
       const { error } = await supabase.from('admins').delete().eq('id', adminId);
       if (error) throw error;
-      showToast('نجاح', 'تم حذف الحساب بنجاح', 'success');
+      showToast('نجاح', 'تم حذف حساب المدير بنجاح', 'success');
       fetchCollegeAdmins(selectedCollege.id);
     } catch (err) {
       showToast('خطأ', err.message || 'فشل حذف الحساب', 'danger');
     }
   };
 
-  const openEditCollege = (college) => {
-    setCollegeForm({
-      id: college.id,
-      name: college.name
-    });
-    setIsCollegeModalOpen(true);
+  const isCollegeExpired = (expiryDate) => {
+    const expiry = new Date(expiryDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    expiry.setHours(0, 0, 0, 0);
+    return expiry < today;
   };
 
   return (
     <div className={styles.adminLayout}>
-      <UniversityAdminSidebar activePage="colleges" />
+      <SuperAdminSidebar activePage="colleges" />
       <div className={styles.mainContent}>
         <div className={styles.pageHeader}>
-          <h1 className={styles.pageTitle}>إدارة الكليات ومدراء الكليات</h1>
-          <Button onClick={() => { setCollegeForm({ id: null, name: '' }); setIsCollegeModalOpen(true); }}>
+          <h1 className={styles.pageTitle}>إدارة الكليات والاشتراكات السنوية</h1>
+          <Button onClick={() => setIsCollegeModalOpen(true)}>
             <Plus size={18} />
-            <span>إضافة كلية جديدة</span>
+            <span>إضافة كلية متعاقدة</span>
           </Button>
         </div>
 
@@ -195,12 +204,12 @@ export default function UniversityAdminColleges() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            {/* قائمة الكليات */}
+            {/* جدول الكليات */}
             <div className={styles.glass} style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--text-primary)' }}>الكليات التابعة للجامعة</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--text-primary)' }}>الكليات الجامعية المسجلة</h2>
               {colleges.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                  لا توجد كليات مضافة بعد. اضغط "إضافة كلية جديدة" للبدء.
+                  لا يوجد كليات مسجلة حالياً بالمنصة.
                 </div>
               ) : (
                 <div className={compStyles.tableContainer}>
@@ -208,22 +217,53 @@ export default function UniversityAdminColleges() {
                     <thead>
                       <Tr>
                         <Th>اسم الكلية</Th>
-                        <Th>تاريخ الإنشاء</Th>
+                        <Th>المحافظة/المدينة</Th>
+                        <Th>تاريخ انتهاء الاشتراك</Th>
+                        <Th>حالة الاشتراك</Th>
                         <Th>العمليات</Th>
                       </Tr>
                     </thead>
                     <tbody>
-                      {colleges.map(college => (
-                        <Tr key={college.id} className={selectedCollege?.id === college.id ? compStyles.rowSelected : ''} onClick={() => setSelectedCollege(college)} style={{ cursor: 'pointer' }}>
-                          <Td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{college.name}</Td>
-                          <Td>{new Date(college.created_at).toLocaleDateString('ar-EG')}</Td>
+                      {colleges.map(col => (
+                        <Tr 
+                          key={col.id} 
+                          className={selectedCollege?.id === col.id ? compStyles.rowSelected : ''}
+                          onClick={() => handleCollegeSelect(col)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <Td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{col.name}</Td>
+                          <Td>{col.city || '-'}</Td>
+                          <Td>{col.subscription_expires_at}</Td>
+                          <Td>
+                            {isCollegeExpired(col.subscription_expires_at) ? (
+                              <Badge variant="danger">منتهي ⚠️</Badge>
+                            ) : (
+                              <Badge variant="success">فعال ✅</Badge>
+                            )}
+                          </Td>
                           <Td onClick={e => e.stopPropagation()}>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
-                              <Button size="icon" variant="secondary" onClick={() => openEditCollege(college)}>
-                                <Edit size={16} />
+                              <Button 
+                                size="sm" 
+                                variant="secondary" 
+                                onClick={() => {
+                                  setCollegeForm({
+                                    id: col.id,
+                                    name: col.name,
+                                    city: col.city || '',
+                                    subscription_expires_at: col.subscription_expires_at
+                                  });
+                                  setIsCollegeModalOpen(true);
+                                }}
+                              >
+                                تعديل
                               </Button>
-                              <Button size="icon" variant="danger" onClick={() => deleteCollege(college.id, college.name)}>
-                                <Trash2 size={16} />
+                              <Button 
+                                size="sm" 
+                                variant="danger" 
+                                onClick={() => deleteCollege(col.id, col.name)}
+                              >
+                                <Trash2 size={14} />
                               </Button>
                             </div>
                           </Td>
@@ -235,45 +275,45 @@ export default function UniversityAdminColleges() {
               )}
             </div>
 
-            {/* إدارة مدراء الكلية المختارة */}
+            {/* إدارة حسابات مدراء الكلية المحددة */}
             {selectedCollege && (
               <div className={styles.glass} style={{ padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <div>
-                    <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--text-primary)' }}>مدراء كلية {selectedCollege.name}</h2>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>مدير الكلية له كامل الصلاحية في إدارة الأقسام والطلاب والأساتذة داخل هذه الكلية فقط.</span>
+                    <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--text-primary)' }}>مدراء الكلية: {selectedCollege.name}</h2>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>الحسابات التي تدير الأقسام والطلاب والأساتذة للكلية.</span>
                   </div>
-                  <Button onClick={() => setIsAdminModalOpen(true)}>
-                    <UserPlus size={18} />
-                    <span>إنشاء حساب مدير كلية</span>
+                  <Button size="sm" onClick={() => setIsAdminModalOpen(true)}>
+                    <Users size={16} />
+                    <span>إنشاء حساب مدير</span>
                   </Button>
                 </div>
 
                 {adminsLoading ? (
-                  <Skeleton height="120px" />
+                  <Skeleton height="100px" />
                 ) : admins.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                    لا يوجد حساب مدير لهذه الكلية حالياً. اضغط "إنشاء حساب مدير كلية" لتفعيل حساب.
+                    لا يوجد حسابات مدراء لهذه الكلية. اضغط على الزر أعلاه لإضافة مدير.
                   </div>
                 ) : (
                   <div className={compStyles.tableContainer}>
                     <Table>
                       <thead>
                         <Tr>
-                          <Th>الاسم</Th>
+                          <Th>الاسم الكامل</Th>
                           <Th>البريد الإلكتروني</Th>
                           <Th>تاريخ الإنشاء</Th>
                           <Th>العمليات</Th>
                         </Tr>
                       </thead>
                       <tbody>
-                        {admins.map(admin => (
-                          <Tr key={admin.id}>
-                            <Td style={{ fontWeight: '600' }}>{admin.name}</Td>
-                            <Td>{admin.email}</Td>
-                            <Td>{new Date(admin.created_at).toLocaleDateString('ar-EG')}</Td>
+                        {admins.map(adm => (
+                          <Tr key={adm.id}>
+                            <Td style={{ fontWeight: '600' }}>{adm.name}</Td>
+                            <Td>{adm.email}</Td>
+                            <Td>{new Date(adm.created_at).toLocaleDateString('ar-EG')}</Td>
                             <Td>
-                              <Button size="icon" variant="danger" onClick={() => deleteAdmin(admin.id, admin.name)}>
+                              <Button size="icon" variant="danger" onClick={() => deleteAdmin(adm.id, adm.name)}>
                                 <Trash2 size={16} />
                               </Button>
                             </Td>
@@ -289,17 +329,44 @@ export default function UniversityAdminColleges() {
         )}
 
         {/* مودال الكلية */}
-        <Modal isOpen={isCollegeModalOpen} onClose={() => setIsCollegeModalOpen(false)} title={collegeForm.id ? 'تعديل الكلية' : 'إضافة كلية جديدة'}>
+        <Modal 
+          isOpen={isCollegeModalOpen} 
+          onClose={() => {
+            setIsCollegeModalOpen(false);
+            setCollegeForm({ id: null, name: '', city: '', subscription_expires_at: '' });
+          }} 
+          title={collegeForm.id ? "تعديل بيانات الكلية الجامعية" : "إضافة كلية جامعية جديدة"}
+        >
           <form onSubmit={saveCollege} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className={compStyles.inputGroup}>
-              <label className={compStyles.label}>اسم الكلية</label>
+              <label className={compStyles.label}>اسم الكلية الجامعية</label>
               <input 
                 type="text" 
                 required
                 className={compStyles.input}
                 value={collegeForm.name}
                 onChange={e => setCollegeForm({ ...collegeForm, name: e.target.value })}
-                placeholder="كلية الهندسة مثلاً"
+                placeholder="مثال: كلية علوم الحاسوب وتكنولوجيا المعلومات"
+              />
+            </div>
+            <div className={compStyles.inputGroup}>
+              <label className={compStyles.label}>المدينة/المحافظة</label>
+              <input 
+                type="text" 
+                className={compStyles.input}
+                value={collegeForm.city}
+                onChange={e => setCollegeForm({ ...collegeForm, city: e.target.value })}
+                placeholder="بغداد"
+              />
+            </div>
+            <div className={compStyles.inputGroup}>
+              <label className={compStyles.label}>تاريخ انتهاء الاشتراك السنوي</label>
+              <input 
+                type="date" 
+                required
+                className={compStyles.input}
+                value={collegeForm.subscription_expires_at}
+                onChange={e => setCollegeForm({ ...collegeForm, subscription_expires_at: e.target.value })}
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
@@ -313,18 +380,18 @@ export default function UniversityAdminColleges() {
         <Modal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} title="إنشاء حساب مدير كلية">
           <form onSubmit={createCollegeAdmin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className={compStyles.inputGroup}>
-              <label className={compStyles.label}>الاسم الثلاثي لمدير الكلية</label>
+              <label className={compStyles.label}>الاسم الثلاثي للمدير</label>
               <input 
                 type="text" 
                 required
                 className={compStyles.input}
                 value={adminForm.name}
                 onChange={e => setAdminForm({ ...adminForm, name: e.target.value })}
-                placeholder="الاسم الكامل للمسؤول"
+                placeholder="الاسم الكامل"
               />
             </div>
             <div className={compStyles.inputGroup}>
-              <label className={compStyles.label}>البريد الإلكتروني</label>
+              <label className={compStyles.label}>البريد الإلكتروني للمدير</label>
               <input 
                 type="email" 
                 required
@@ -335,7 +402,7 @@ export default function UniversityAdminColleges() {
               />
             </div>
             <div className={compStyles.inputGroup}>
-              <label className={compStyles.label}>كلمة المرور</label>
+              <label className={compStyles.label}>كلمة مرور الحساب</label>
               <input 
                 type="password" 
                 required

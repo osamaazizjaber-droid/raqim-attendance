@@ -26,7 +26,6 @@ DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS stages CASCADE;
 DROP TABLE IF EXISTS departments CASCADE;
 DROP TABLE IF EXISTS colleges CASCADE;
-DROP TABLE IF EXISTS universities CASCADE;
 DROP TABLE IF EXISTS system_admins CASCADE;
 
 -- 1. جدول المشرفين العامين لمنصة رقيم (Super Admins)
@@ -38,8 +37,8 @@ CREATE TABLE system_admins (
 -- إدراج المشرف الافتراضي للمنصة
 INSERT INTO system_admins (email) VALUES ('osamaazizjaber@gmail.com') ON CONFLICT DO NOTHING;
 
--- 2. جدول الجامعات
-CREATE TABLE universities (
+-- 2. جدول الكليات (الجهات المستأجرة للخدمة - Tenants)
+CREATE TABLE colleges (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
     city text,
@@ -47,15 +46,7 @@ CREATE TABLE universities (
     created_at timestamptz DEFAULT now()
 );
 
--- 3. جدول الكليات التابعة للجامعة
-CREATE TABLE colleges (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    university_id uuid REFERENCES universities(id) ON DELETE CASCADE,
-    name text NOT NULL,
-    created_at timestamptz DEFAULT now()
-);
-
--- 4. جدول الأقسام التابعة للكليات
+-- 3. جدول الأقسام التابعة للكليات
 CREATE TABLE departments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     college_id uuid REFERENCES colleges(id) ON DELETE CASCADE,
@@ -63,7 +54,7 @@ CREATE TABLE departments (
     created_at timestamptz DEFAULT now()
 );
 
--- 5. جدول المراحل الدراسية
+-- 4. جدول المراحل الدراسية
 CREATE TABLE stages (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL UNIQUE, -- مثل: المرحلة الأولى، الثانية، الثالثة، الرابعة، الخامسة
@@ -79,7 +70,7 @@ INSERT INTO stages (name) VALUES
 ('المرحلة الخامسة')
 ON CONFLICT DO NOTHING;
 
--- 6. جدول المواد الدراسية (Courses)
+-- 5. جدول المواد الدراسية (Courses)
 CREATE TABLE courses (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
@@ -89,32 +80,30 @@ CREATE TABLE courses (
     created_at timestamptz DEFAULT now()
 );
 
--- 7. جدول مدراء النظام (University & College Admins)
+-- 6. جدول مدراء الكليات (College Admins)
 CREATE TABLE admins (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
     name text NOT NULL,
     email text NOT NULL UNIQUE,
-    role text NOT NULL CHECK (role IN ('university', 'college')),
-    university_id uuid REFERENCES universities(id) ON DELETE CASCADE,
-    college_id uuid REFERENCES colleges(id) ON DELETE CASCADE, -- NULL لمدير الجامعة
+    role text NOT NULL CHECK (role = 'college'),
+    college_id uuid REFERENCES colleges(id) ON DELETE CASCADE,
     created_at timestamptz DEFAULT now()
 );
 
--- 8. جدول الأساتذة
+-- 7. جدول الأساتذة
 CREATE TABLE professors (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
     name text NOT NULL,
     email text NOT NULL UNIQUE,
-    university_id uuid REFERENCES universities(id) ON DELETE CASCADE,
     college_id uuid REFERENCES colleges(id) ON DELETE CASCADE,
     subscription_expires_at date NOT NULL,
     telegram_chat_id bigint,
     created_at timestamptz DEFAULT now()
 );
 
--- 9. جدول ربط الأساتذة بالمواد
+-- 8. جدول ربط الأساتذة بالمواد
 CREATE TABLE professor_courses (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     professor_id uuid REFERENCES professors(id) ON DELETE CASCADE,
@@ -123,10 +112,9 @@ CREATE TABLE professor_courses (
     UNIQUE(professor_id, course_id)
 );
 
--- 10. جدول الطلاب
+-- 9. جدول الطلاب
 CREATE TABLE students (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    university_id uuid REFERENCES universities(id) ON DELETE SET NULL,
     college_id uuid REFERENCES colleges(id) ON DELETE SET NULL,
     department_id uuid REFERENCES departments(id) ON DELETE SET NULL,
     stage_id uuid REFERENCES stages(id) ON DELETE SET NULL,
@@ -140,7 +128,7 @@ CREATE TABLE students (
     created_at timestamptz DEFAULT now()
 );
 
--- 11. جدول المواد والسنوات الأكاديمية المسجل بها الطالب (الانتظام والإعادة)
+-- 10. جدول المواد والسنوات الأكاديمية المسجل بها الطالب (الانتظام والإعادة)
 CREATE TABLE student_courses (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id uuid REFERENCES students(id) ON DELETE CASCADE,
@@ -151,7 +139,7 @@ CREATE TABLE student_courses (
     UNIQUE(student_id, course_id, academic_year)
 );
 
--- 12. جدول جلسات الحضور (Attendance Sessions)
+-- 11. جدول جلسات الحضور (Attendance Sessions)
 CREATE TABLE sessions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     professor_id uuid REFERENCES professors(id) ON DELETE CASCADE,
@@ -163,7 +151,7 @@ CREATE TABLE sessions (
     created_at timestamptz DEFAULT now()
 );
 
--- 13. جدول تسجيل الحضور الفعلي
+-- 12. جدول تسجيل الحضور الفعلي
 CREATE TABLE attendance (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id uuid REFERENCES sessions(id) ON DELETE CASCADE,
@@ -172,7 +160,7 @@ CREATE TABLE attendance (
     UNIQUE(session_id, student_id)
 );
 
--- 14. جدول ترحيل الطلاب للمراحل
+-- 13. جدول ترحيل الطلاب للمراحل
 CREATE TABLE student_migrations (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id uuid REFERENCES students(id) ON DELETE CASCADE,
@@ -182,7 +170,7 @@ CREATE TABLE student_migrations (
     migrated_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
 );
 
--- 15. جدول مقياس التقديرات الثابت
+-- 14. جدول مقياس التقديرات الثابت
 CREATE TABLE grade_scales (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     min_score int NOT NULL,
@@ -200,7 +188,7 @@ INSERT INTO grade_scales (min_score, max_score, label) VALUES
 (90, 100, 'امتياز')
 ON CONFLICT DO NOTHING;
 
--- 16. جدول نتائج درجات الطلاب
+-- 15. جدول نتائج درجات الطلاب
 CREATE TABLE results (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id uuid REFERENCES students(id) ON DELETE CASCADE,
@@ -212,7 +200,7 @@ CREATE TABLE results (
     UNIQUE(student_id, course_id, academic_year)
 );
 
--- 17. جدول الشهادات الأكاديمية المولدة
+-- 16. جدول الشهادات الأكاديمية المولدة
 CREATE TABLE certificates (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id uuid REFERENCES students(id) ON DELETE CASCADE,
@@ -225,7 +213,7 @@ CREATE TABLE certificates (
     UNIQUE(student_id, academic_year)
 );
 
--- 18. طابور طلبات إعادة الإرسال عبر البوت
+-- 17. طابور طلبات إعادة الإرسال عبر البوت
 CREATE TABLE telegram_resend_requests (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id uuid REFERENCES students(id) ON DELETE CASCADE,
@@ -234,14 +222,13 @@ CREATE TABLE telegram_resend_requests (
     created_at timestamptz DEFAULT now()
 );
 
--- 19. طابور طلبات إنشاء المستخدمين (المدراء والأساتذة) عبر البوت لتجاوز قيود RLS
+-- 18. طابور طلبات إنشاء المستخدمين (المدراء والأساتذة) عبر البوت لتجاوز قيود RLS
 CREATE TABLE user_creation_requests (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     email text NOT NULL,
     password text NOT NULL,
     name text NOT NULL,
-    role text NOT NULL CHECK (role IN ('university', 'college', 'professor')),
-    university_id uuid REFERENCES universities(id) ON DELETE CASCADE,
+    role text NOT NULL CHECK (role IN ('college', 'professor')),
     college_id uuid REFERENCES colleges(id) ON DELETE CASCADE,
     subscription_expires_at date, -- للأستاذ فقط
     status text NOT NULL DEFAULT 'pending', -- pending, processing, completed, failed
@@ -276,17 +263,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- دالة جلب معرف جامعة المشرف للمستخدم الحالي
-CREATE OR REPLACE FUNCTION get_admin_university_id(usr_id uuid)
-RETURNS uuid AS $$
-DECLARE
-  univ_id uuid;
-BEGIN
-  SELECT university_id INTO univ_id FROM admins WHERE user_id = usr_id;
-  RETURN univ_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- دالة جلب معرف كلية المشرف للمستخدم الحالي
 CREATE OR REPLACE FUNCTION get_admin_college_id(usr_id uuid)
 RETURNS uuid AS $$
@@ -314,7 +290,6 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- =========================================================================
 
 ALTER TABLE system_admins ENABLE ROW LEVEL SECURITY;
-ALTER TABLE universities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE colleges ENABLE ROW LEVEL SECURITY;
 ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stages ENABLE ROW LEVEL SECURITY;
@@ -336,29 +311,22 @@ ALTER TABLE user_creation_requests ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Super Admins can manage admins" ON system_admins FOR ALL USING (is_super_admin());
 CREATE POLICY "Authenticated users can view admins" ON system_admins FOR SELECT TO authenticated USING (true);
 
--- 2. سياسات universities
-CREATE POLICY "Everyone authenticated can view universities" ON universities FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Super Admins can manage universities" ON universities FOR ALL USING (is_super_admin());
-
--- 3. سياسات colleges
+-- 2. سياسات colleges
 CREATE POLICY "Everyone authenticated can view colleges" ON colleges FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Super Admin and Univ Admin can manage colleges" ON colleges FOR ALL USING (
-  is_super_admin() OR 
-  (university_id = get_admin_university_id(auth.uid()) AND get_admin_role(auth.uid()) = 'university')
-);
+CREATE POLICY "Super Admins can manage colleges" ON colleges FOR ALL USING (is_super_admin());
 
--- 4. سياسات departments
+-- 3. سياسات departments
 CREATE POLICY "Everyone authenticated can view departments" ON departments FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Super Admin and College Admin can manage departments" ON departments FOR ALL USING (
   is_super_admin() OR 
   (college_id = get_admin_college_id(auth.uid()) AND get_admin_role(auth.uid()) = 'college')
 );
 
--- 5. سياسات stages
+-- 4. سياسات stages
 CREATE POLICY "Everyone authenticated can view stages" ON stages FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Admins can manage stages" ON stages FOR ALL USING (is_super_admin() OR get_admin_role(auth.uid()) IS NOT NULL);
 
--- 6. سياسات courses
+-- 5. سياسات courses
 CREATE POLICY "Everyone authenticated can view courses" ON courses FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Super Admin and College Admin can manage courses" ON courses FOR ALL USING (
   is_super_admin() OR 
@@ -369,34 +337,28 @@ CREATE POLICY "Super Admin and College Admin can manage courses" ON courses FOR 
   )
 );
 
--- 7. سياسات admins
+-- 6. سياسات admins
 CREATE POLICY "Admins can view matching admin profiles" ON admins FOR SELECT TO authenticated USING (
   user_id = auth.uid() OR 
-  is_super_admin() OR 
-  (university_id = get_admin_university_id(auth.uid()) AND get_admin_role(auth.uid()) = 'university')
+  is_super_admin() OR
+  college_id = get_admin_college_id(auth.uid())
 );
-CREATE POLICY "Super Admin and Univ Admin can write admins" ON admins FOR ALL USING (
-  is_super_admin() OR 
-  (
-    university_id = get_admin_university_id(auth.uid()) 
-    AND get_admin_role(auth.uid()) = 'university' 
-    AND role = 'college'
-  )
+CREATE POLICY "Super Admin can write admins" ON admins FOR ALL USING (
+  is_super_admin()
 );
 
--- 8. سياسات professors
+-- 7. سياسات professors
 CREATE POLICY "Professors can be viewed by admins and themselves" ON professors FOR SELECT TO authenticated USING (
   user_id = auth.uid() OR 
   is_super_admin() OR 
-  college_id = get_admin_college_id(auth.uid()) OR
-  university_id = get_admin_university_id(auth.uid())
+  college_id = get_admin_college_id(auth.uid())
 );
 CREATE POLICY "Super Admin and College Admin can manage professors" ON professors FOR ALL USING (
   is_super_admin() OR 
   college_id = get_admin_college_id(auth.uid())
 );
 
--- 9. سياسات professor_courses
+-- 8. سياسات professor_courses
 CREATE POLICY "Professors and admins can view course assignments" ON professor_courses FOR SELECT TO authenticated USING (
   is_super_admin() OR 
   professor_id IN (
@@ -413,14 +375,14 @@ CREATE POLICY "Super Admin and College Admin can manage assignments" ON professo
   )
 );
 
--- 10. سياسات students
+-- 9. سياسات students
 CREATE POLICY "Everyone authenticated can view students" ON students FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Super Admin and College Admin can manage students" ON students FOR ALL USING (
   is_super_admin() OR 
   college_id = get_admin_college_id(auth.uid())
 );
 
--- 11. سياسات student_courses
+-- 10. سياسات student_courses
 CREATE POLICY "Everyone authenticated can view student courses" ON student_courses FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Super Admin and College Admin can manage student courses" ON student_courses FOR ALL USING (
   is_super_admin() OR 
@@ -430,7 +392,7 @@ CREATE POLICY "Super Admin and College Admin can manage student courses" ON stud
   )
 );
 
--- 12. سياسات sessions
+-- 11. سياسات sessions
 CREATE POLICY "Everyone authenticated can view sessions" ON sessions FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Professors can manage their sessions" ON sessions FOR ALL USING (
   is_super_admin() OR 
@@ -438,21 +400,21 @@ CREATE POLICY "Professors can manage their sessions" ON sessions FOR ALL USING (
   get_admin_college_id(auth.uid()) = (SELECT college_id FROM professors WHERE id = professor_id)
 );
 
--- 13. سياسات attendance
+-- 12. سياسات attendance
 CREATE POLICY "Everyone authenticated can view attendance" ON attendance FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Professors can manage session attendance" ON attendance FOR ALL USING (
   is_super_admin() OR 
   session_id IN (SELECT id FROM sessions WHERE professor_id = get_professor_id())
 );
 
--- 14. سياسات student_migrations
+-- 13. سياسات student_migrations
 CREATE POLICY "Everyone authenticated can view student migrations" ON student_migrations FOR SELECT TO authenticated USING (true);
 CREATE POLICY "College admins can log migrations" ON student_migrations FOR ALL USING (
   is_super_admin() OR 
   get_admin_role(auth.uid()) = 'college'
 );
 
--- 15. سياسات results
+-- 14. سياسات results
 CREATE POLICY "Public results read access" ON results FOR SELECT USING (true);
 CREATE POLICY "Super Admin and College Admin can manage results" ON results FOR ALL USING (
   is_super_admin() OR 
@@ -462,7 +424,7 @@ CREATE POLICY "Super Admin and College Admin can manage results" ON results FOR 
   )
 );
 
--- 16. سياسات certificates
+-- 15. سياسات certificates
 CREATE POLICY "Public certificates read access" ON certificates FOR SELECT USING (true);
 CREATE POLICY "Super Admin and College Admin can manage certificates" ON certificates FOR ALL USING (
   is_super_admin() OR 
@@ -472,13 +434,13 @@ CREATE POLICY "Super Admin and College Admin can manage certificates" ON certifi
   )
 );
 
--- 17. سياسات telegram_resend_requests
+-- 16. سياسات telegram_resend_requests
 CREATE POLICY "Admins can manage resend requests" ON telegram_resend_requests FOR ALL USING (
   is_super_admin() OR 
   get_admin_role(auth.uid()) = 'college'
 );
 
--- 18. سياسات user_creation_requests
+-- 17. سياسات user_creation_requests
 CREATE POLICY "Admins can manage creation requests" ON user_creation_requests FOR ALL USING (
   is_super_admin() OR 
   get_admin_role(auth.uid()) IS NOT NULL
@@ -502,7 +464,6 @@ CREATE OR REPLACE FUNCTION create_new_user(
   p_password text,
   p_name text,
   p_role text,
-  p_university_id uuid,
   p_college_id uuid DEFAULT NULL,
   p_subscription_expires_at date DEFAULT NULL
 )
@@ -514,7 +475,6 @@ BEGIN
   -- 1. التحقق من صلاحية المنشئ للعملية
   IF NOT (
     is_super_admin() OR 
-    get_admin_role(auth.uid()) = 'university' OR 
     get_admin_role(auth.uid()) = 'college'
   ) THEN
     RAISE EXCEPTION 'غير مصرح لك بإنشاء مستخدمين جدد في المنصة';
@@ -580,12 +540,12 @@ BEGIN
   END IF;
 
   -- 5. إدخال البيانات في الجدول المناسب للدور
-  IF p_role = 'university' OR p_role = 'college' THEN
-    INSERT INTO admins (user_id, name, email, role, university_id, college_id)
-    VALUES (new_user_id, p_name, p_email, p_role, p_university_id, p_college_id);
+  IF p_role = 'college' THEN
+    INSERT INTO admins (user_id, name, email, role, college_id)
+    VALUES (new_user_id, p_name, p_email, p_role, p_college_id);
   ELSIF p_role = 'professor' THEN
-    INSERT INTO professors (user_id, name, email, university_id, college_id, subscription_expires_at)
-    VALUES (new_user_id, p_name, p_email, p_university_id, p_college_id, COALESCE(p_subscription_expires_at, (now() + interval '1 year')::date));
+    INSERT INTO professors (user_id, name, email, college_id, subscription_expires_at)
+    VALUES (new_user_id, p_name, p_email, p_college_id, COALESCE(p_subscription_expires_at, (now() + interval '1 year')::date));
   END IF;
 
   RETURN new_user_id;

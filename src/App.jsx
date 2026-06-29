@@ -11,11 +11,7 @@ import Login from './pages/professor/Login';
 
 // المشرف العام (Super Admin)
 import SuperAdminDashboard from './pages/super-admin/Dashboard';
-import SuperAdminUniversities from './pages/super-admin/Universities';
-
-// مدير الجامعة (University Admin)
-import UniversityAdminDashboard from './pages/university-admin/Dashboard';
-import UniversityAdminColleges from './pages/university-admin/Colleges';
+import SuperAdminColleges from './pages/super-admin/Colleges';
 
 // مدير الكلية (College Admin)
 import CollegeAdminDashboard from './pages/college-admin/Dashboard';
@@ -38,7 +34,7 @@ import styles from './styles/professor.module.css';
 
 // 1. شاشة حجب الحساب بسبب انتهاء صلاحية الاشتراك
 export function SubscriptionBlockedScreen({ reason }) {
-  const isUnivExpired = reason === 'university_expired';
+  const isCollegeExpired = reason === 'college_expired';
 
   return (
     <div className={styles.blockContainer}>
@@ -47,14 +43,14 @@ export function SubscriptionBlockedScreen({ reason }) {
           <ShieldAlert size={56} style={{ color: 'var(--danger)' }} />
         </div>
         <h2 className={styles.blockTitle}>
-          {isUnivExpired ? 'انتهت صلاحية اشتراك الجامعة ⚠️' : 'انتهت صلاحية اشتراكك الشخصي ⚠️'}
+          {isCollegeExpired ? 'انتهت صلاحية اشتراك الكلية ⚠️' : 'انتهت صلاحية اشتراكك الشخصي ⚠️'}
         </h2>
         <p className={styles.blockMessage}>
-          {isUnivExpired ? (
+          {isCollegeExpired ? (
             <>
-              عذراً، لقد انتهت صلاحية الاشتراك السنوي الخاص بجامعتكم في منصة رقيم.
+              عذراً، لقد انتهت صلاحية الاشتراك السنوي الخاص بكليتكم في منصة رقيم.
               <br />
-              يرجى التواصل مع إدارة الجامعة أو الشركة لتجديد الاشتراك السنوي لجامعتكم.
+              يرجى التواصل مع عمادة الكلية أو إدارة المنصة لتجديد الاشتراك السنوي لكليتكم.
             </>
           ) : (
             <>
@@ -92,32 +88,7 @@ function SuperAdminRoute({ children }) {
   return children;
 }
 
-// 3. حارس مسارات مدير الجامعة (University Admin Guard)
-function UniversityAdminRoute({ children }) {
-  const { user, role, loading: authLoading } = useAuth();
-  const { isExpired, loading: subLoading, reason } = useSubscription();
-
-  if (authLoading || subLoading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', justifyContent: 'center', alignItems: 'center', backgroundColor: 'var(--bg-primary)', padding: '2rem' }}>
-        <Skeleton width="200px" height="2rem" style={{ marginBottom: '1.5rem' }} />
-        <Skeleton width="80%" height="300px" />
-      </div>
-    );
-  }
-
-  if (!user || role !== 'university-admin') {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (isExpired) {
-    return <SubscriptionBlockedScreen reason={reason} />;
-  }
-
-  return children;
-}
-
-// 4. حارس مسارات مدير الكلية (College Admin Guard)
+// 3. حارس مسارات مدير الكلية (College Admin Guard)
 function CollegeAdminRoute({ children }) {
   const { user, role, loading: authLoading } = useAuth();
   const { isExpired, loading: subLoading, reason } = useSubscription();
@@ -142,7 +113,7 @@ function CollegeAdminRoute({ children }) {
   return children;
 }
 
-// 5. حارس مسارات الأستاذ (Professor Guard)
+// 4. حارس مسارات الأستاذ (Professor Guard)
 function ProfessorRoute({ children }) {
   const { user, role, loading: authLoading } = useAuth();
   const { isExpired, loading: subLoading, reason } = useSubscription();
@@ -167,7 +138,7 @@ function ProfessorRoute({ children }) {
   return children;
 }
 
-// 6. حارس شاشة الدخول الموحدة
+// 5. حارس شاشة الدخول الموحدة
 function LoginRoute({ children }) {
   const { user, role, loading } = useAuth();
 
@@ -177,8 +148,6 @@ function LoginRoute({ children }) {
     switch (role) {
       case 'super-admin':
         return <Navigate to="/super-admin/dashboard" replace />;
-      case 'university-admin':
-        return <Navigate to="/university-admin/dashboard" replace />;
       case 'college-admin':
         return <Navigate to="/college-admin/dashboard" replace />;
       case 'professor':
@@ -213,22 +182,10 @@ export default function App() {
                 <SuperAdminDashboard />
               </SuperAdminRoute>
             } />
-            <Route path="/super-admin/universities" element={
+            <Route path="/super-admin/colleges" element={
               <SuperAdminRoute>
-                <SuperAdminUniversities />
+                <SuperAdminColleges />
               </SuperAdminRoute>
-            } />
-
-            {/* مسارات مدير الجامعة (University Admin) */}
-            <Route path="/university-admin/dashboard" element={
-              <UniversityAdminRoute>
-                <UniversityAdminDashboard />
-              </UniversityAdminRoute>
-            } />
-            <Route path="/university-admin/colleges" element={
-              <UniversityAdminRoute>
-                <UniversityAdminColleges />
-              </UniversityAdminRoute>
             } />
 
             {/* مسارات مدير الكلية (College Admin) */}

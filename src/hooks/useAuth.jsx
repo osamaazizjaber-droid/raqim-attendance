@@ -44,10 +44,10 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      // 2. التحقق من جدول المدراء (جامعة أو كلية)
+      // 2. التحقق من جدول المدراء (مدير الكلية)
       const { data: admin, error: adminErr } = await supabase
         .from('admins')
-        .select('*, universities(name, subscription_expires_at)')
+        .select('*, colleges(name, subscription_expires_at)')
         .eq('user_id', sessionUser.id)
         .maybeSingle();
 
@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }) => {
 
       if (admin) {
         setUser(sessionUser);
-        setRole(admin.role === 'university' ? 'university-admin' : 'college-admin');
+        setRole('college-admin');
         setAdminDetails(admin);
         setProfessor(null);
         setLoading(false);
@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }) => {
       // 3. التحقق من جدول الأساتذة
       const { data: prof, error: profErr } = await supabase
         .from('professors')
-        .select('*, universities(name, subscription_expires_at)')
+        .select('*, colleges(name, subscription_expires_at)')
         .eq('user_id', sessionUser.id)
         .maybeSingle();
 

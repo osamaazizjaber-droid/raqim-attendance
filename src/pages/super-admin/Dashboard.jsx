@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  School, 
+  Building, 
   Users, 
   GraduationCap, 
   LogOut, 
   Activity,
-  Calendar,
-  Building
+  Calendar
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
@@ -49,11 +48,11 @@ export function SuperAdminSidebar({ activePage }) {
           <span>الإحصائيات العامة</span>
         </Link>
         <Link 
-          to="/super-admin/universities" 
-          className={`${styles.navLink} ${activePage === 'universities' ? styles.navLinkActive : ''}`}
+          to="/super-admin/colleges" 
+          className={`${styles.navLink} ${activePage === 'colleges' ? styles.navLinkActive : ''}`}
         >
-          <School size={20} />
-          <span>إدارة الجامعات</span>
+          <Building size={20} />
+          <span>إدارة الكليات والاشتراكات</span>
         </Link>
         <button 
           onClick={handleLogout}
@@ -70,7 +69,6 @@ export function SuperAdminSidebar({ activePage }) {
 
 export default function SuperAdminDashboard() {
   const [stats, setStats] = useState({
-    universities: 0,
     colleges: 0,
     professors: 0,
     students: 0
@@ -81,29 +79,23 @@ export default function SuperAdminDashboard() {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        
-        // 1. عدد الجامعات
-        const { count: univCount } = await supabase
-          .from('universities')
-          .select('*', { count: 'exact', head: true });
 
-        // 2. عدد الكليات
+        // 1. عدد الكليات
         const { count: collegeCount } = await supabase
           .from('colleges')
           .select('*', { count: 'exact', head: true });
 
-        // 3. عدد الأساتذة
+        // 2. عدد الأساتذة
         const { count: profCount } = await supabase
           .from('professors')
           .select('*', { count: 'exact', head: true });
 
-        // 4. عدد الطلاب
+        // 3. عدد الطلاب
         const { count: studCount } = await supabase
           .from('students')
           .select('*', { count: 'exact', head: true });
 
         setStats({
-          universities: univCount || 0,
           colleges: collegeCount || 0,
           professors: profCount || 0,
           students: studCount || 0
@@ -127,37 +119,26 @@ export default function SuperAdminDashboard() {
         </div>
 
         {loading ? (
-          <div className={styles.statsGrid}>
-            <Skeleton height="120px" />
+          <div className={styles.statsGrid} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
             <Skeleton height="120px" />
             <Skeleton height="120px" />
             <Skeleton height="120px" />
           </div>
         ) : (
-          <div className={styles.statsGrid}>
+          <div className={styles.statsGrid} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
             <div className={styles.statCard}>
               <div className={styles.statInfo}>
-                <h3>إجمالي الجامعات</h3>
-                <div className={styles.statNumber}>{stats.universities}</div>
-              </div>
-              <div className={styles.statIcon}>
-                <School size={28} />
-              </div>
-            </div>
-
-            <div className={styles.statCard}>
-              <div className={styles.statInfo}>
-                <h3>إجمالي الكليات</h3>
+                <h3>إجمالي الكليات المشتركة</h3>
                 <div className={styles.statNumber}>{stats.colleges}</div>
               </div>
-              <div className={styles.statIcon} style={{ color: 'var(--accent)', backgroundColor: 'var(--accent-light)' }}>
+              <div className={styles.statIcon}>
                 <Building size={28} />
               </div>
             </div>
 
             <div className={styles.statCard}>
               <div className={styles.statInfo}>
-                <h3>الأساتذة المسجلين</h3>
+                <h3>أعضاء الهيئة التدريسية</h3>
                 <div className={styles.statNumber}>{stats.professors}</div>
               </div>
               <div className={styles.statIcon} style={{ color: 'var(--success)', backgroundColor: 'var(--success-light)' }}>
@@ -167,7 +148,7 @@ export default function SuperAdminDashboard() {
 
             <div className={styles.statCard}>
               <div className={styles.statInfo}>
-                <h3>إجمالي الطلاب</h3>
+                <h3>الطلاب المسجلين</h3>
                 <div className={styles.statNumber}>{stats.students}</div>
               </div>
               <div className={styles.statIcon} style={{ color: 'var(--warning)', backgroundColor: 'var(--warning-light)' }}>
@@ -180,8 +161,8 @@ export default function SuperAdminDashboard() {
         <div className={styles.glass} style={{ padding: '2rem', borderRadius: 'var(--radius-lg)', marginTop: '2rem' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--text-primary)' }}>مرحباً بك في لوحة تحكم رقيم 🔐</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.7' }}>
-            بصفتك مشرفاً عاماً على منصة رقيم، يمكنك إضافة وإدارة الجامعات المتعاقدة، وتجديد تاريخ صلاحية اشتراكاتها السنوية. 
-            عند إنشاء جامعة جديدة، يمكنك إنشاء حساب مدير الجامعة (University Admin) الذي يتولى بدوره تهيئة كلياتها وإدارتها.
+            بصفتك مشرفاً عاماً على منصة رقيم، يمكنك إضافة وإدارة الكليات الجامعية المتعاقدة بشكل مباشر، وتجديد صلاحية اشتراكاتها السنوية. 
+            عند تسجيل كلية جديدة، يمكنك تفعيل حساب مدير الكلية (College Admin) مباشرة لتهيئة الأقسام الدراسية، تسجيل كشوف الطلاب، والبدء باستخدام المنصة.
           </p>
         </div>
       </div>

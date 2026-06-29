@@ -1,8 +1,8 @@
 import { useAuth } from './useAuth';
 
 /**
- * خطاف مخصص للتحقق من حالة اشتراك الجامعة أو الأستاذ.
- * يمنع وصول الأساتذة والمدراء عند انتهاء تاريخ صلاحية اشتراك الجامعة أو الحساب الشخصي.
+ * خطاف مخصص للتحقق من حالة اشتراك الكلية أو الأستاذ.
+ * يمنع وصول الأساتذة والمدراء عند انتهاء تاريخ صلاحية اشتراك الكلية أو الحساب الشخصي.
  */
 export function useSubscription() {
   const { professor, adminDetails, role, loading: authLoading } = useAuth();
@@ -19,49 +19,49 @@ export function useSubscription() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // 1. مدراء الجامعة ومدراء الكليات: يخضعون لاشتراك الجامعة فقط
-  if (role === 'university-admin' || role === 'college-admin') {
-    if (!adminDetails || !adminDetails.universities?.subscription_expires_at) {
-      return { isExpired: true, loading: false, expiryDate: null, reason: 'university_expired' };
+  // 1. مدراء الكليات: يخضعون لاشتراك الكلية فقط
+  if (role === 'college-admin') {
+    if (!adminDetails || !adminDetails.colleges?.subscription_expires_at) {
+      return { isExpired: true, loading: false, expiryDate: null, reason: 'college_expired' };
     }
-    const univExpiry = new Date(adminDetails.universities.subscription_expires_at);
-    univExpiry.setHours(0, 0, 0, 0);
+    const collegeExpiry = new Date(adminDetails.colleges.subscription_expires_at);
+    collegeExpiry.setHours(0, 0, 0, 0);
     
-    const isExpired = univExpiry < today;
+    const isExpired = collegeExpiry < today;
     return {
       isExpired,
       loading: false,
-      expiryDate: adminDetails.universities.subscription_expires_at,
-      reason: isExpired ? 'university_expired' : null
+      expiryDate: adminDetails.colleges.subscription_expires_at,
+      reason: isExpired ? 'college_expired' : null
     };
   }
 
-  // 2. الأساتذة: يخضعون لاشتراكهم الشخصي + اشتراك الجامعة (Double Subscription Gate)
+  // 2. الأساتذة: يخضعون لاشتراكهم الشخصي + اشتراك الكلية (Double Subscription Gate)
   if (role === 'professor') {
     if (!professor) {
       return { isExpired: true, loading: false, expiryDate: null, reason: 'no_profile' };
     }
 
-    // التحقق من اشتراك الجامعة
-    if (!professor.universities?.subscription_expires_at) {
-      return { isExpired: true, loading: false, expiryDate: null, reason: 'university_expired' };
+    // التحقق من اشتراك الكلية
+    if (!professor.colleges?.subscription_expires_at) {
+      return { isExpired: true, loading: false, expiryDate: null, reason: 'college_expired' };
     }
-    const univExpiry = new Date(professor.universities.subscription_expires_at);
-    univExpiry.setHours(0, 0, 0, 0);
-    const isUnivExpired = univExpiry < today;
+    const collegeExpiry = new Date(professor.colleges.subscription_expires_at);
+    collegeExpiry.setHours(0, 0, 0, 0);
+    const isCollegeExpired = collegeExpiry < today;
 
     // التحقق من اشتراك الأستاذ الشخصي
     const profExpiry = new Date(professor.subscription_expires_at);
     profExpiry.setHours(0, 0, 0, 0);
     const isProfExpired = profExpiry < today;
 
-    const isExpired = isUnivExpired || isProfExpired;
+    const isExpired = isCollegeExpired || isProfExpired;
 
     return {
       isExpired,
       loading: false,
       expiryDate: professor.subscription_expires_at,
-      reason: isUnivExpired ? 'university_expired' : (isProfExpired ? 'personal_expired' : null)
+      reason: isCollegeExpired ? 'college_expired' : (isProfExpired ? 'personal_expired' : null)
     };
   }
 

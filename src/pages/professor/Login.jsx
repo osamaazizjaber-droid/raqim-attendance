@@ -24,9 +24,6 @@ export default function Login() {
         case 'super-admin':
           navigate('/super-admin/dashboard', { replace: true });
           break;
-        case 'university-admin':
-          navigate('/university-admin/dashboard', { replace: true });
-          break;
         case 'college-admin':
           navigate('/college-admin/dashboard', { replace: true });
           break;
