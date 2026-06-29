@@ -57,24 +57,25 @@ async function processResendRequest(request) {
     // 3. إرسال الكرت كصورة عبر تيليجرام
     const frontendUrl = process.env.FRONTEND_URL || 'https://raqim-attendance.vercel.app';
     const caption = `
-📥 *إعادة إرسال بطاقة الحضور الرسمية:*
+📥 <b>إعادة إرسال بطاقة الحضور الرسمية:</b>
 
-*الاسم:* ${student.full_name}
-*الرقم الجامعي:* ${student.student_number}
-*الجامعة:* ${student.colleges?.university || 'جامعة رقيم'}
-*الكلية:* ${student.colleges?.name || 'الكلية'}
+<b>الاسم:</b> ${student.full_name}
+<b>الرقم الجامعي:</b> ${student.student_number}
+<b>الجامعة:</b> ${student.colleges?.university || 'جامعة رقيم'}
+<b>الكلية:</b> ${student.colleges?.name || 'الكلية'}
 
 تم إرسال هذا الكارت بطلب من إدارة النظام.
 
-📊 *للاستعلام عن نتائج امتحاناتك وتحميل شهادتك الرسمية:*
-[اضغط هنا لفتح بوابة النتائج](${frontendUrl}/results)
+📊 <b>للاستعلام عن نتائج امتحاناتك وتحميل شهادتك الرسمية:</b>
+<a href="${frontendUrl}/results">اضغط هنا لفتح بوابة النتائج وتنزيل الشهادة</a>
+<i>(يرجى إدخال رقمك الجامعي وحل مسألة التحقق الرياضية البسيطة التي ستظهر لك لاستلام النتيجة وتنزيل الشهادة)</i>
 `;
 
     if (student.telegram_file_id) {
       // إرسال الصورة باستخدام معرّف ملف تيليجرام المخزن (سريع ودون استهلاك تخزين)
       await bot.sendPhoto(student.telegram_chat_id, student.telegram_file_id, {
         caption: caption,
-        parse_mode: 'Markdown'
+        parse_mode: 'HTML'
       });
     } else {
       // إرسال الصورة باستخدام الرابط وحفظ معرّف الملف للتمكين من حذف الملف الأصلي
@@ -82,7 +83,7 @@ async function processResendRequest(request) {
 
       const sentMsg = await bot.sendPhoto(student.telegram_chat_id, student.qr_image_url, {
         caption: caption,
-        parse_mode: 'Markdown'
+        parse_mode: 'HTML'
       });
 
       const fileId = sentMsg.photo?.[sentMsg.photo.length - 1]?.file_id;
