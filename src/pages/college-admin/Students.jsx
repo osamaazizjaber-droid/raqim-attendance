@@ -547,6 +547,37 @@ export default function CollegeAdminStudents() {
     document.body.removeChild(link);
   };
 
+  // تصدير كشف الطلاب المسجلين حالياً (لعرض الأكواد التي تم توليدها تلقائياً)
+  const exportStudentsList = () => {
+    if (filteredStudents.length === 0) {
+      showToast('تنبيه', 'لا يوجد طلاب لتصديرهم حالياً.', 'warning');
+      return;
+    }
+
+    const csvHeaders = 'الاسم الكامل,الرقم الجامعي (الكود),القسم,المرحلة,الدراسة,حالة الحساب\n';
+    const csvRows = filteredStudents.map(s => {
+      const name = s.full_name.replace(/,/g, ' ');
+      const num = s.student_number;
+      const dept = (s.departments?.name || '').replace(/,/g, ' ');
+      const stage = (s.stages?.name || '').replace(/,/g, ' ');
+      const study = s.study_type || '';
+      const telegram = s.telegram_chat_id ? 'مرتبط بالبوت' : 'غير مرتبط';
+      return `${name},${num},${dept},${stage},${study},${telegram}`;
+    }).join('\n');
+
+    const csvContent = csvHeaders + csvRows;
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'كشف_طلاب_الكلية_بالأكواد.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('تصدير ناجح ✅', 'تم تحميل كشف الطلاب والأكواد بنجاح.', 'success');
+  };
+
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.student_number.includes(searchQuery);
@@ -560,6 +591,10 @@ export default function CollegeAdminStudents() {
         <div className={styles.pageHeader}>
           <h1 className={styles.pageTitle}>إدارة كشوف الطلاب والـ QR</h1>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <Button variant="secondary" onClick={exportStudentsList}>
+              <Download size={18} />
+              <span>تصدير كشف الأكواد (CSV)</span>
+            </Button>
             <Button variant="secondary" onClick={() => setIsImportModalOpen(true)}>
               <Upload size={18} />
               <span>استيراد كشف (CSV)</span>
