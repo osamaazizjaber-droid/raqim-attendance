@@ -528,11 +528,11 @@ export default function CollegeAdminResults() {
 
   // دالة لتحميل نموذج ملف كشف الدرجات بصيغة CSV تدعم الترميز العربي بترميز UTF-8 BOM
   const downloadTemplate = () => {
-    const csvContent = 'student_number,course_name,score,academic_year\n' +
-      '2023/CS/0142,هياكل البيانات,85.5,2024/2025\n' +
-      '2023/CS/0143,هياكل البيانات,45.0,2024/2025\n' +
-      '2023/CS/0144,الذكاء الاصطناعي,92.0,2024/2025\n' +
-      '2023/CS/0145,شبكات الحاسوب,73.5,2024/2025\n';
+    const csvContent = 'الرقم الجامعي,اسم المادة,الدرجة,التقدير,السنة الدراسية\n' +
+      '2023/CS/0142,هياكل البيانات,85.5,جيد جداً,2024/2025\n' +
+      '2023/CS/0143,هياكل البيانات,,مقبول,2024/2025\n' +
+      '2023/CS/0144,الذكاء الاصطناعي,92.0,امتياز,2024/2025\n' +
+      '2023/CS/0145,شبكات الحاسوب,,متوسط,2024/2025\n';
     
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
