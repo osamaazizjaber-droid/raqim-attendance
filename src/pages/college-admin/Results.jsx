@@ -166,31 +166,18 @@ export default function CollegeAdminResults() {
 
       const resultsToInsert = [];
 
+      // المفاتيح الثابتة لاستبعادها عند البحث عن المواد
+      const fixedKeys = [
+        'student_number', 'الرقم الجامعي', 'الرقم',
+        'academic_year', 'السنة الدراسية', 'العام الدراسي', 'السنة',
+        'full_name', 'الاسم الكامل', 'الاسم', 'اسم الطالب', 'الاسم الثلاثي'
+      ];
+
       resultsPreview.forEach((row, idx) => {
-        // دعم المسميات الإنجليزية والعربية للأعمدة لتسهيل الاستيراد على المسؤول
         const studNum = String(
           row.student_number || 
           row['الرقم الجامعي'] || 
           row['الرقم'] || 
-          ''
-        ).trim();
-
-        const courseName = String(
-          row.course_name || 
-          row['اسم المادة'] || 
-          row['المادة'] || 
-          row['اسم المقرر'] || 
-          row['المقرر'] || 
-          ''
-        ).trim().toLowerCase();
-        
-        let score = parseFloat(row.score || row['الدرجة'] || row['درجة'] || row['العلامة']);
-        let gradeLabel = String(
-          row.grade_label || 
-          row['التقدير'] || 
-          row['التقدير العام'] || 
-          row['تقدير'] || 
-          row['grade'] || 
           ''
         ).trim();
 
@@ -203,36 +190,48 @@ export default function CollegeAdminResults() {
         ).trim();
 
         const studentId = studentsMap.get(studNum);
-        const courseId = coursesMap.get(courseName);
+        if (!studentId) return;
 
-        if (!studentId || !courseId) return;
+        // المرور على كافة الأعمدة المتبقية والتي تمثل المواد
+        Object.keys(row).forEach(key => {
+          if (fixedKeys.includes(key)) return;
 
-        // إذا كانت الدرجة فارغة أو غير رقمية، ولكن التقدير موجود
-        if (isNaN(score) && gradeLabel) {
-          const defaultScores = {
-            'امتياز': 95,
-            'جيد جداً': 85,
-            'جيد': 75,
-            'متوسط': 65,
-            'مقبول': 55,
-            'ضعيف': 45
-          };
-          score = defaultScores[gradeLabel] || 55; // افتراض مقبول (55)
-        } else if (!isNaN(score) && !gradeLabel) {
-          // احتساب تقدير الدرجة تلقائياً
-          const scale = gradeScales.find(s => score >= s.min_score && score <= s.max_score);
-          gradeLabel = scale ? scale.label : 'مقبول';
-        } else if (isNaN(score) && !gradeLabel) {
-          // كلاهما فارغ
-          return;
-        }
+          const courseNameClean = key.trim().toLowerCase();
+          const courseId = coursesMap.get(courseNameClean);
 
-        resultsToInsert.push({
-          student_id: studentId,
-          course_id: courseId,
-          academic_year: year,
-          score: score,
-          grade_label: gradeLabel
+          if (!courseId) return; // المادة غير مسجلة بالقسم
+
+          const cellValue = String(row[key] || '').trim();
+          if (!cellValue) return; // فارغ، نتخطى المادة للطالب الحالي
+
+          let score = parseFloat(cellValue);
+          let gradeLabel = '';
+
+          if (isNaN(score)) {
+            // القيمة عبارة عن تقدير (مثل: مقبول)
+            gradeLabel = cellValue;
+            const defaultScores = {
+              'امتياز': 95,
+              'جيد جداً': 85,
+              'جيد': 75,
+              'متوسط': 65,
+              'مقبول': 55,
+              'ضعيف': 45
+            };
+            score = defaultScores[gradeLabel] || 55;
+          } else {
+            // القيمة رقمية
+            const scale = gradeScales.find(s => score >= s.min_score && score <= s.max_score);
+            gradeLabel = scale ? scale.label : 'مقبول';
+          }
+
+          resultsToInsert.push({
+            student_id: studentId,
+            course_id: courseId,
+            academic_year: year,
+            score: score,
+            grade_label: gradeLabel
+          });
         });
       });
 
@@ -558,11 +557,11 @@ export default function CollegeAdminResults() {
 
   // دالة لتحميل نموذج ملف كشف الدرجات بصيغة CSV تدعم الترميز العربي بترميز UTF-8 BOM
   const downloadTemplate = () => {
-    const csvContent = 'الرقم الجامعي,اسم المادة,الدرجة,التقدير,السنة الدراسية\n' +
-      '2023/CS/0142,هياكل البيانات,85.5,جيد جداً,2024/2025\n' +
-      '2023/CS/0143,هياكل البيانات,,مقبول,2024/2025\n' +
-      '2023/CS/0144,الذكاء الاصطناعي,92.0,امتياز,2024/2025\n' +
-      '2023/CS/0145,شبكات الحاسوب,,متوسط,2024/2025\n';
+    const csvContent = 'الرقم الجامعي,اسم الطالب,هياكل البيانات,الذكاء الاصطناعي,شبكات الحاسوب,السنة الدراسية\n' +
+      '1001,علي أحمد حسين,85.5,امتياز,جيد,2024/2025\n' +
+      '1002,فاطمة عباس محمد,,مقبول,متوسط,2024/2025\n' +
+      '1003,أحمد رعد علي,92.0,,جيد جداً,2024/2025\n' +
+      '1004,زينب جعفر حسن,73.5,جيد جداً,,2024/2025\n';
     
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -724,14 +723,14 @@ export default function CollegeAdminResults() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className={styles.glass} style={{ padding: '1rem', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)' }}>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                💡 <b>صيغة ملف الدرجات المطلوب:</b>
+                💡 <b>صيغة شبكة الدرجات (Matrix) المقبولة:</b>
                 <br />
-                يمكنك رفع ملف Excel (<b>.xlsx</b>) أو CSV يحتوي على الأعمدة التالية بدقة:
+                يمكنك رفع ملف Excel (<b>.xlsx</b>) أو CSV بتنسيق شبكة، حيث يتم كتابة كل طالب في سطر مستقل والأعمدة تمثل أسماء المواد كالتالي:
                 <br />
-                <code style={{ direction: 'ltr', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px', margin: '0.5rem 0', fontFamily: 'monospace' }}>
-                  student_number, course_name, score, academic_year
+                <code style={{ direction: 'rtl', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px', margin: '0.5rem 0', fontFamily: 'monospace' }}>
+                  الرقم الجامعي، اسم الطالب (اختياري)، هياكل البيانات، الذكاء الاصطناعي، شبكات الحاسوب، السنة الدراسية
                 </code>
-                التقديرات (ممتاز، ضعيف، جيد جداً...) يتم احتسابها تلقائياً بالاعتماد على درجات الطلاب.
+                * اكتب الدرجة الرقمية (مثل: 85.5) أو التقدير مباشرة (مثل: مقبول) في خلية المادة. اترك الخلية فارغة لعدم رصد المادة للطالب.
               </p>
             </div>
 
@@ -762,19 +761,17 @@ export default function CollegeAdminResults() {
                   <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', textAlign: 'right' }}>
                     <thead>
                       <tr style={{ backgroundColor: 'var(--bg-tertiary)' }}>
-                        <th style={{ padding: '6px' }}>رقم الطالب</th>
-                        <th style={{ padding: '6px' }}>اسم المادة</th>
-                        <th style={{ padding: '6px' }}>الدرجة</th>
-                        <th style={{ padding: '6px' }}>السنة</th>
+                        {Object.keys(resultsPreview[0] || {}).slice(0, 6).map((header, idx) => (
+                          <th key={idx} style={{ padding: '6px' }}>{header}</th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
                       {resultsPreview.slice(0, 10).map((r, i) => (
                         <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '6px' }}>{r.student_number}</td>
-                          <td style={{ padding: '6px' }}>{r.course_name}</td>
-                          <td style={{ padding: '6px', fontWeight: 'bold' }}>{r.score}</td>
-                          <td style={{ padding: '6px' }}>{r.academic_year || selectedYear}</td>
+                          {Object.keys(r).slice(0, 6).map((key, idx) => (
+                            <td key={idx} style={{ padding: '6px' }}>{String(r[key] || '')}</td>
+                          ))}
                         </tr>
                       ))}
                     </tbody>
