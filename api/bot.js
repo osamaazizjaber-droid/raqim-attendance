@@ -245,20 +245,32 @@ async function handleTextMessage(chatId, text) {
     ? `✅ *تم تفعيل البوت وربطه بحسابك بنجاح!*\n\n*الاسم:* ${targetStudent.full_name}\n*الرقم الجامعي:* ${targetStudent.student_number}\n*الجامعة:* ${targetStudent.colleges?.university || 'جامعة رقيم'}\n\n_لقد تم قفل حسابك بالتيليجرام على هذا الرقم الجامعي. في المرات القادمة ستحصل على بطاقتك فوراً بمجرد إرسال أي رسالة للبوت._`
     : `✅ *مرحباً بك مجدداً! إليك بطاقة الحضور الخاصة بك:*\n\n*الاسم:* ${targetStudent.full_name}\n*الرقم الجامعي:* ${targetStudent.student_number}\n*الجامعة:* ${targetStudent.colleges?.university || 'جامعة رقيم'}`;
 
+  // رابط صفحة النتائج كزر أسفل الرسالة
+  const resultsUrl = `https://www.sys-wms.pro/results?q=${targetStudent.student_number}`;
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '📊 عرض نتائج الامتحانات', url: resultsUrl }]
+    ]
+  };
+
   if (targetStudent.telegram_file_id) {
     await bot.sendPhoto(chatId, targetStudent.telegram_file_id, {
       caption: caption,
-      parse_mode: 'Markdown'
+      parse_mode: 'Markdown',
+      reply_markup: keyboard
     });
   } else {
     if (!targetStudent.qr_image_url) {
-      await bot.sendMessage(chatId, '⚠️ تم العثور على اسمك، ولكن لم يتم توليد بطاقة الـ QR الخاصة بك بعد. يرجى التواصل مع إدارة النظام لتوليدها.');
+      await bot.sendMessage(chatId, '⚠️ تم العثور على اسمك، ولكن لم يتم توليد بطاقة الـ QR الخاصة بك بعد. يرجى التواصل مع إدارة النظام لتوليدها.', {
+        reply_markup: keyboard
+      });
       return;
     }
 
     const sentMsg = await bot.sendPhoto(chatId, targetStudent.qr_image_url, {
       caption: caption,
-      parse_mode: 'Markdown'
+      parse_mode: 'Markdown',
+      reply_markup: keyboard
     });
 
     const fileId = sentMsg.photo?.[sentMsg.photo.length - 1]?.file_id;
@@ -297,16 +309,25 @@ async function processResendRequest(request) {
 تم إرسال هذا الكارت بطلب من إدارة النظام.
 `;
 
+    const resultsUrl = `https://www.sys-wms.pro/results?q=${student.student_number}`;
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '📊 عرض نتائج الامتحانات', url: resultsUrl }]
+      ]
+    };
+
     if (student.telegram_file_id) {
       await bot.sendPhoto(student.telegram_chat_id, student.telegram_file_id, {
         caption: caption,
-        parse_mode: 'Markdown'
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
       });
     } else {
       if (!student.qr_image_url) return;
       const sentMsg = await bot.sendPhoto(student.telegram_chat_id, student.qr_image_url, {
         caption: caption,
-        parse_mode: 'Markdown'
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
       });
 
       const fileId = sentMsg.photo?.[sentMsg.photo.length - 1]?.file_id;
