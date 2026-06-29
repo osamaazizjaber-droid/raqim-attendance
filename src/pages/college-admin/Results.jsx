@@ -686,10 +686,6 @@ export default function CollegeAdminResults() {
         <div className={styles.pageHeader}>
           <h1 className={styles.pageTitle}>لوحة إدارة النتائج والشهادات</h1>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <Button variant="secondary" onClick={openCertificateGeneratorModal} disabled={!selectedDept || !selectedStage}>
-              <FileText size={18} />
-              <span>توليد الشهادات (PDF)</span>
-            </Button>
             <Button onClick={() => setIsUploadModalOpen(true)}>
               <Upload size={18} />
               <span>رفع درجات الاختبار (Excel)</span>
