@@ -214,8 +214,36 @@ export default function CollegeAdminStudents() {
       }
 
       // ترويسة الأعمدة: الاسم، الرقم الجامعي، القسم، المرحلة، نوع الدراسة
-      // full_name, student_number, department, stage, study_type
-      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const rawHeaders = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      
+      const headerMap = {
+        'full_name': 'full_name',
+        'الاسم الكامل': 'full_name',
+        'الاسم': 'full_name',
+        'اسم الطالب': 'full_name',
+        'الاسم الثلاثي': 'full_name',
+        
+        'student_number': 'student_number',
+        'الرقم الجامعي': 'student_number',
+        'الرقم': 'student_number',
+        'الكود': 'student_number',
+        'كود الطالب': 'student_number',
+        
+        'department': 'department',
+        'القسم': 'department',
+        'القسم العلمي': 'department',
+        'قسم': 'department',
+        
+        'stage': 'stage',
+        'المرحلة': 'stage',
+        'مرحلة': 'stage',
+        
+        'study_type': 'study_type',
+        'الدراسة': 'study_type',
+        'نوع الدراسة': 'study_type'
+      };
+
+      const headers = rawHeaders.map(h => headerMap[h] || h);
       
       const rows = [];
       for (let i = 1; i < lines.length; i++) {
@@ -730,14 +758,18 @@ export default function CollegeAdminStudents() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className={styles.glass} style={{ padding: '1rem', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)' }}>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                💡 <b>صيغة ملف الاستيراد المطلوبة:</b>
+                💡 <b>صيغة ملف الاستيراد المقبولة:</b>
                 <br />
-                يجب أن يكون الملف بامتداد <b>.csv</b> يحتوي على الترويسة التالية بالضبط:
+                يجب أن يكون الملف بامتداد <b>.csv</b> ويحتوي على الأعمدة باللغة العربية أو الإنجليزية:
                 <br />
-                <code style={{ direction: 'ltr', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px', margin: '0.5rem 0', fontFamily: 'monospace' }}>
-                  full_name, student_number, department, stage, study_type
+                <code style={{ direction: 'rtl', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px', margin: '0.5rem 0', fontFamily: 'monospace' }}>
+                  الاسم الكامل، الرقم الجامعي (اختياري)، القسم، المرحلة، نوع الدراسة
                 </code>
-                تأكد من مطابقة أسماء الأقسام والمراحل كما هي مسجلة بالكلية.
+                أو بالإنجليزية:
+                <code style={{ direction: 'ltr', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px', margin: '0.5rem 0', fontFamily: 'monospace' }}>
+                  full_name, student_number (optional), department, stage, study_type
+                </code>
+                * في حال ترك حقل <b>الرقم الجامعي</b> فارغاً، سيقوم النظام تلقائياً بتوليد رمز رقمي عشوائي فريد ومؤمن لكل طالب.
               </p>
             </div>
 
