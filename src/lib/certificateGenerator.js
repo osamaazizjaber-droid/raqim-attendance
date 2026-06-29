@@ -201,25 +201,31 @@ export const generateCertificatePDF = async ({
         tableEndY = 1010 + 220;
       }
 
-      // 6. التقدير العام والنتيجة النهائية باستخدام دالة دمج الألوان
+      // 6. التقدير العام والنتيجة النهائية مع محاذاة عمودية دقيقة وتجنب مشاكل علامات الترقيم في RTL
       const finalY = tableEndY + 120;
 
-      const drawColoredValue = (label, value, valueColor, x, y) => {
+      const drawAlignedRow = (label, value, valueColor, y) => {
+        // أ. كتابة العنوان (Label) محاذياً لليمين
         ctx.textAlign = 'right';
         ctx.fillStyle = '#475569'; // Slate-600
         ctx.font = 'bold 36px Tajawal, Arial, sans-serif';
-        ctx.fillText(label, x, y);
-        
-        const labelWidth = ctx.measureText(label).width;
+        ctx.fillText(label, 2650, y);
+
+        // ب. كتابة النقطتين الرأسيتين (Colon) في عمود محاذاة عمودي ثابت لتلافي مشاكل اتجاه الخطوط
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#475569';
+        ctx.fillText(':', 2250, y);
+
+        // ج. كتابة القيمة محاذية لليمين لتظهر متراصة بشكل متناسق مع العمود
         ctx.textAlign = 'right';
         ctx.fillStyle = valueColor;
         ctx.font = 'bold 38px Tajawal, Arial, sans-serif';
-        ctx.fillText(value, x - labelWidth - 15, y);
+        ctx.fillText(value, 2220, y);
       };
 
       const statusColor = isPassed ? '#10B981' : '#EF4444';
       const statusText = isPassed ? 'ناجح' : 'راسب';
-      drawColoredValue('النتيجة الكلية للوثيقة:  ', statusText, statusColor, 2650, finalY);
+      drawAlignedRow('النتيجة الكلية للوثيقة', statusText, statusColor, finalY);
 
       const colorsMap = {
         'امتياز': '#C9A84C',
@@ -230,7 +236,7 @@ export const generateCertificatePDF = async ({
         'ضعيف': '#EF4444'
       };
       const overallColor = colorsMap[overallGrade] || '#475569';
-      drawColoredValue('التقدير العام للمعدل:  ', overallGrade, overallColor, 2650, finalY + 75);
+      drawAlignedRow('التقدير العام للمعدل', overallGrade, overallColor, finalY + 75);
 
       // 7. التواقيع مع خطوط فاصلة أنيقة
       ctx.strokeStyle = '#94A3B8';
