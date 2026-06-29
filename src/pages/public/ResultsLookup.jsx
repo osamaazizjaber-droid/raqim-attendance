@@ -56,40 +56,18 @@ export default function ResultsLookup() {
     }
 
     try {
-      // 2. تطبيع وتنظيف الرقم الجامعي المدخل (تحويل الأرقام الشرقية/الفارسية إلى إنجليزية، وتكبير الأحرف وإزالة المسافات)
-      const normalizedStudentNumber = studentNumber
-        .trim()
-        .toUpperCase()
-        .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
-        .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+      const response = await fetch(`/api/results?studentNumber=${encodeURIComponent(studentNumber)}`);
+      const data = await response.json();
 
-      // البحث عن الطالب بواسطة الرقم الجامعي (مطابقة غير حساسة لحالة الأحرف)
-      const { data: student, error: studErr } = await supabase
-        .from('students')
-        .select('*, departments(name), stages(name), colleges(name, university)')
-        .ilike('student_number', normalizedStudentNumber)
-        .maybeSingle();
-
-      if (studErr) throw studErr;
-
-      if (!student) {
-        setError('الرقم الجامعي المدخل غير موجود، يرجى التأكد منه.');
+      if (!response.ok) {
+        setError(data.error || 'الرقم الجامعي المدخل غير موجود، يرجى التأكد منه.');
         generateNewCaptcha();
         setLoading(false);
         return;
       }
 
-      // 3. جلب نتائج امتحانات الطالب
-      const { data: resList, error: resErr } = await supabase
-        .from('results')
-        .select('*, courses(name)')
-        .eq('student_id', student.id)
-        .order('created_at', { ascending: true });
-
-      if (resErr) throw resErr;
-
-      setStudentData(student);
-      setResults(resList || []);
+      setStudentData(data.student);
+      setResults(data.results || []);
       setLookupSuccess(true);
     } catch (err) {
       setError('حدث خطأ غير متوقع أثناء معالجة البحث.');
