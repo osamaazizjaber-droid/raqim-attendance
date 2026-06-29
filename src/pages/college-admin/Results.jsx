@@ -662,7 +662,7 @@ export default function CollegeAdminResults() {
     const term = searchQuery.toLowerCase();
     return (
       r.students?.full_name.toLowerCase().includes(term) ||
-      r.students?.student_number.includes(term) ||
+      r.students?.student_number.toLowerCase().includes(term) ||
       r.courses?.name.toLowerCase().includes(term)
     );
   });

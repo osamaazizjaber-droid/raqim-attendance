@@ -56,11 +56,18 @@ export default function ResultsLookup() {
     }
 
     try {
-      // 2. البحث عن الطالب بواسطة الرقم الجامعي
+      // 2. تطبيع وتنظيف الرقم الجامعي المدخل (تحويل الأرقام الشرقية/الفارسية إلى إنجليزية، وتكبير الأحرف وإزالة المسافات)
+      const normalizedStudentNumber = studentNumber
+        .trim()
+        .toUpperCase()
+        .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+        .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+
+      // البحث عن الطالب بواسطة الرقم الجامعي (مطابقة غير حساسة لحالة الأحرف)
       const { data: student, error: studErr } = await supabase
         .from('students')
         .select('*, departments(name), stages(name), colleges(name, university)')
-        .eq('student_number', studentNumber.trim())
+        .ilike('student_number', normalizedStudentNumber)
         .maybeSingle();
 
       if (studErr) throw studErr;
@@ -283,6 +290,66 @@ export default function ResultsLookup() {
               </div>
               <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--accent)', fontWeight: 'bold' }}>{studentData?.student_number}</span>
             </div>
+
+            {/* عرض بطاقة الحضور (الباركود) */}
+            {studentData?.qr_image_url ? (
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                gap: '0.75rem',
+                padding: '1.25rem',
+                backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                border: '1px dashed var(--border)',
+                borderRadius: 'var(--radius-md)',
+                marginTop: '-0.25rem'
+              }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '500' }}>بطاقة الحضور والـ QR الرسمية المعتمدة</span>
+                <img 
+                  src={studentData.qr_image_url} 
+                  alt={`بطاقة حضور ${studentData.full_name}`}
+                  style={{ 
+                    width: '180px', 
+                    height: 'auto', 
+                    border: '1px solid var(--border)', 
+                    borderRadius: 'var(--radius-md)', 
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)' 
+                  }}
+                />
+                <a 
+                  href={studentData.qr_image_url} 
+                  download={`Raqim_${studentData.student_number}.png`}
+                  style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '0.35rem', 
+                    fontSize: '0.8rem', 
+                    color: 'var(--accent)', 
+                    textDecoration: 'none',
+                    fontWeight: 'bold',
+                    marginTop: '0.25rem'
+                  }}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Download size={14} />
+                  <span>تنزيل كرت الحضور</span>
+                </a>
+              </div>
+            ) : studentData?.telegram_chat_id ? (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '0.85rem', 
+                border: '1px dashed rgba(16, 185, 129, 0.3)', 
+                borderRadius: 'var(--radius-md)', 
+                backgroundColor: 'rgba(16, 185, 129, 0.04)',
+                fontSize: '0.8rem',
+                color: 'var(--success)',
+                lineHeight: '1.5'
+              }}>
+                ⚡ تم ربط وتفعيل حسابك عبر تيليجرام بنجاح! يمكنك استلام بطاقة الحضور الخاصة بك في أي وقت مباشرة عبر البوت.
+              </div>
+            ) : null}
 
             {results.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>

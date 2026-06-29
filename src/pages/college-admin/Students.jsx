@@ -580,7 +580,7 @@ export default function CollegeAdminStudents() {
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.student_number.includes(searchQuery);
+      student.student_number.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
 
