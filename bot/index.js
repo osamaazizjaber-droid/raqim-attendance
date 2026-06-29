@@ -86,14 +86,14 @@ async function processResendRequest(request) {
       });
 
       const fileId = sentMsg.photo?.[sentMsg.photo.length - 1]?.file_id;
-      
+
       if (fileId) {
         // تحديث قاعدة البيانات
         await supabase
           .from('students')
-          .update({ 
+          .update({
             telegram_file_id: fileId,
-            qr_image_url: null 
+            qr_image_url: null
           })
           .eq('id', student.id);
 
@@ -102,7 +102,7 @@ async function processResendRequest(request) {
         await supabase.storage
           .from('qr-cards')
           .remove([path]);
-          
+
         console.log(`🧹 تم مسح الصورة من التخزين السحابي للطالب ${student.full_name} بعد إعادة الإرسال بنجاح.`);
       }
     }
@@ -117,11 +117,11 @@ async function processResendRequest(request) {
 
   } catch (err) {
     console.error(`❌ فشل معالجة طلب إعادة الإرسال (${requestId}):`, err.message);
-    
+
     // تحديث حالة الطلب بالفشل وتسجيل الخطأ للشفافية
     await supabase
       .from('telegram_resend_requests')
-      .update({ 
+      .update({
         status: 'failed',
         error_message: err.message || 'حدث خطأ غير معروف أثناء الإرسال'
       })
@@ -216,9 +216,9 @@ async function processUserCreationRequest(request) {
     console.error(`❌ فشل إنشاء حساب ${request.email}:`, err);
     await supabase
       .from('user_creation_requests')
-      .update({ 
-        status: 'failed', 
-        error_message: err.message || 'حدث خطأ غير معروف' 
+      .update({
+        status: 'failed',
+        error_message: err.message || 'حدث خطأ غير معروف'
       })
       .eq('id', request.id);
   }
@@ -310,8 +310,8 @@ async function sendSessionReportToProfessor(session) {
 
     // حساب العام الدراسي الحالي
     const now = new Date();
-    const currentYear = now.getMonth() >= 8 
-      ? `${now.getFullYear()}/${now.getFullYear() + 1}` 
+    const currentYear = now.getMonth() >= 8
+      ? `${now.getFullYear()}/${now.getFullYear() + 1}`
       : `${now.getFullYear() - 1}/${now.getFullYear()}`;
 
     // جلب الطلاب المعيدين في المادة من جدول student_courses
@@ -409,7 +409,7 @@ ${absentListText || 'لا يوجد غيابات (الحضور مكتمل) 🎉'}
     if (presentCount > 0) {
       const presentMessageHeader = `*🟢 قائمة الطلاب الحاضرين (${presentCount}):*\n`;
       let currentMsg = presentMessageHeader;
-      
+
       const lines = presentListText.split('\n');
       for (const line of lines) {
         if ((currentMsg + line + '\n').length > 4000) {
@@ -418,7 +418,7 @@ ${absentListText || 'لا يوجد غيابات (الحضور مكتمل) 🎉'}
         }
         currentMsg += line + '\n';
       }
-      
+
       if (currentMsg.trim() !== '') {
         await bot.sendMessage(professor.telegram_chat_id, currentMsg, { parse_mode: 'Markdown' });
       }
@@ -447,7 +447,7 @@ supabase
       console.log('🔔 Received UPDATE on sessions:', payload);
       const newSession = payload.new;
       const oldSession = payload.old;
-      
+
       // نتحقق مما إذا كانت الجلسة قد أغلقت للتو
       let justClosed = false;
       if (newSession.ended_at && !newSession.is_open) {
