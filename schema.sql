@@ -492,3 +492,87 @@ ALTER PUBLICATION supabase_realtime ADD TABLE attendance;
 ALTER PUBLICATION supabase_realtime ADD TABLE telegram_resend_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE user_creation_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE sessions;
+
+-- =========================================================================
+-- دالة إنشاء حساب مستخدم جديد مباشرة (RPC - Direct User Creation)
+-- =========================================================================
+
+CREATE OR REPLACE FUNCTION create_new_user(
+  p_email text,
+  p_password text,
+  p_name text,
+  p_role text,
+  p_university_id uuid,
+  p_college_id uuid DEFAULT NULL,
+  p_subscription_expires_at date DEFAULT NULL
+)
+RETURNS uuid AS $$
+DECLARE
+  new_user_id uuid;
+  encrypted_pw text;
+BEGIN
+  -- 1. التحقق من صلاحية المنشئ للعملية
+  IF NOT (
+    is_super_admin() OR 
+    get_admin_role(auth.uid()) = 'university' OR 
+    get_admin_role(auth.uid()) = 'college'
+  ) THEN
+    RAISE EXCEPTION 'غير مصرح لك بإنشاء مستخدمين جدد في المنصة';
+  END IF;
+
+  -- 2. التحقق من عدم وجود البريد الإلكتروني مسبقاً
+  IF EXISTS (SELECT 1 FROM auth.users WHERE email = p_email) THEN
+    RAISE EXCEPTION 'البريد الإلكتروني المدخل مسجل بالفعل في النظام';
+  END IF;
+
+  -- 3. تشفير كلمة المرور بنمط bcrypt متوافق مع Supabase Auth
+  encrypted_pw := crypt(p_password, gen_salt('bf'));
+
+  -- 4. إدخال المستخدم في جدول auth.users التابع لسوبابيس
+  INSERT INTO auth.users (
+    instance_id,
+    id,
+    aud,
+    role,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    created_at,
+    updated_at,
+    confirmation_token,
+    email_change,
+    email_change_token_new,
+    recovery_token
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000000',
+    gen_random_uuid(),
+    'authenticated',
+    'authenticated',
+    p_email,
+    encrypted_pw,
+    now(), -- تأكيد فوري لتجاوز إيميل التحقق
+    '{"provider":"email","providers":["email"]}',
+    jsonb_build_object('full_name', p_name),
+    now(),
+    now(),
+    '',
+    '',
+    '',
+    ''
+  )
+  RETURNING id INTO new_user_id;
+
+  -- 5. إدخال البيانات في الجدول المناسب للدور
+  IF p_role = 'university' OR p_role = 'college' THEN
+    INSERT INTO admins (user_id, name, email, role, university_id, college_id)
+    VALUES (new_user_id, p_name, p_email, p_role, p_university_id, p_college_id);
+  ELSIF p_role = 'professor' THEN
+    INSERT INTO professors (user_id, name, email, university_id, college_id, subscription_expires_at)
+    VALUES (new_user_id, p_name, p_email, p_university_id, p_college_id, COALESCE(p_subscription_expires_at, (now() + interval '1 year')::date));
+  END IF;
+
+  RETURN new_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

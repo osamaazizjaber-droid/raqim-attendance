@@ -122,70 +122,23 @@ export default function CollegeAdminProfessors() {
     }
   };
 
-  // Create Professor request with real-time tracking
+  // Create Professor request directly via RPC
   const handleCreateProfessor = async (e) => {
     e.preventDefault();
     setLoading(true);
-    let requestRecord = null;
     
     try {
-      // 1. إدراج طلب إنشاء الأستاذ في طابور العمليات
-      const { data: request, error: insertError } = await supabase
-        .from('user_creation_requests')
-        .insert({
-          email: createForm.email,
-          password: createForm.password,
-          name: createForm.name,
-          role: 'professor',
-          university_id: adminDetails.university_id,
-          college_id: adminDetails.college_id,
-          subscription_expires_at: createForm.subscription_expires_at
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-      requestRecord = request;
-
-      // 2. الاستماع اللحظي لحالة الطلب حتى يكتمل أو يفشل
-      let channel;
-      
-      const waitForCompletion = () => new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          if (channel) supabase.removeChannel(channel);
-          reject(new Error('انتهت مهلة الانتظار. يرجى التأكد من تشغيل خادم البوت (bot) في الخلفية.'));
-        }, 15000);
-
-        channel = supabase
-          .channel(`request_${request.id}`)
-          .on(
-            'postgres_changes',
-            {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'user_creation_requests',
-              filter: `id=eq.${request.id}`
-            },
-            (payload) => {
-              const updated = payload.new;
-              if (updated.status === 'completed') {
-                clearTimeout(timeout);
-                supabase.removeChannel(channel);
-                resolve();
-              } else if (updated.status === 'failed') {
-                clearTimeout(timeout);
-                supabase.removeChannel(channel);
-                reject(new Error(updated.error_message || 'فشل إنشاء الحساب لأسباب مجهولة'));
-              }
-            }
-          )
-          .subscribe();
+      const { data, error } = await supabase.rpc('create_new_user', {
+        p_email: createForm.email,
+        p_password: createForm.password,
+        p_name: createForm.name,
+        p_role: 'professor',
+        p_university_id: adminDetails.university_id,
+        p_college_id: adminDetails.college_id,
+        p_subscription_expires_at: createForm.subscription_expires_at
       });
 
-      await waitForCompletion();
-
-      // 3. تنظيف الطلب بعد اكتماله
-      await supabase.from('user_creation_requests').delete().eq('id', request.id);
+      if (error) throw error;
 
       showToast('نجاح', 'تم إنشاء حساب الأستاذ وتفعيله بنجاح', 'success');
       setIsCreateModalOpen(false);
@@ -193,9 +146,6 @@ export default function CollegeAdminProfessors() {
       fetchInitialData();
     } catch (err) {
       showToast('خطأ في الإنشاء', err.message || 'فشل إنشاء حساب الأستاذ', 'danger');
-      if (requestRecord) {
-        await supabase.from('user_creation_requests').delete().eq('id', requestRecord.id).catch(() => {});
-      }
     } finally {
       setLoading(false);
     }
@@ -444,7 +394,7 @@ export default function CollegeAdminProfessors() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
               <Button type="button" variant="secondary" onClick={() => setIsCreateModalOpen(false)}>إلغاء</Button>
-              <Button type="submit">تفعيل الحساب</Button>
+              <Button type="submit">إنشاء وتفعيل الحساب</Button>
             </div>
           </form>
         </Modal>

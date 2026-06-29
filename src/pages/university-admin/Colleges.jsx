@@ -132,30 +132,27 @@ export default function UniversityAdminColleges() {
   const createCollegeAdmin = async (e) => {
     e.preventDefault();
     if (!selectedCollege) return;
+    setLoading(true);
     try {
-      showToast('جاري الطلب', 'يتم إرسال طلب إنشاء الحساب الحين...', 'info');
-      const { error } = await supabase
-        .from('user_creation_requests')
-        .insert({
-          email: adminForm.email,
-          password: adminForm.password,
-          name: adminForm.name,
-          role: 'college',
-          university_id: adminDetails.university_id,
-          college_id: selectedCollege.id
-        });
+      const { data, error } = await supabase.rpc('create_new_user', {
+        p_email: adminForm.email,
+        p_password: adminForm.password,
+        p_name: adminForm.name,
+        p_role: 'college',
+        p_university_id: adminDetails.university_id,
+        p_college_id: selectedCollege.id,
+        p_subscription_expires_at: null
+      });
 
       if (error) throw error;
-      showToast('تم إرسال الطلب ✅', 'سيقوم البوت بإنشاء وتفعيل الحساب بالخلفية.', 'success');
+      showToast('نجاح', 'تم إنشاء حساب مدير الكلية وتفعيله بنجاح', 'success');
       setIsAdminModalOpen(false);
       setAdminForm({ name: '', email: '', password: '' });
-      
-      setTimeout(() => {
-        if (selectedCollege) fetchCollegeAdmins(selectedCollege.id);
-      }, 3500);
-
+      fetchCollegeAdmins(selectedCollege.id);
     } catch (err) {
-      showToast('خطأ', err.message || 'فشل إرسال طلب إنشاء حساب مدير الكلية', 'danger');
+      showToast('خطأ في الإنشاء', err.message || 'فشل إنشاء حساب مدير الكلية', 'danger');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -350,7 +347,7 @@ export default function UniversityAdminColleges() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
               <Button type="button" variant="secondary" onClick={() => setIsAdminModalOpen(false)}>إلغاء</Button>
-              <Button type="submit">إرسال طلب التفعيل</Button>
+              <Button type="submit">إنشاء وتفعيل الحساب</Button>
             </div>
           </form>
         </Modal>
