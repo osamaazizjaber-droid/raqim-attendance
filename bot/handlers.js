@@ -194,7 +194,7 @@ export const handleTextMessage = async (bot, msg) => {
           })
           .eq('id', student.id);
 
-        const path = `${student.university_id}/${student.id}.png`;
+        const path = `${student.college_id}/${student.id}.png`;
         await supabase.storage
           .from('qr-cards')
           .remove([path]);

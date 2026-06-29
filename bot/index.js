@@ -149,7 +149,7 @@ async function processResendRequest(request) {
           .eq('id', student.id);
 
         // حذف الصورة من تخزين Supabase Storage لتوفير المساحة
-        const path = `${student.university_id}/${student.id}.png`;
+        const path = `${student.college_id}/${student.id}.png`;
         await supabase.storage
           .from('qr-cards')
           .remove([path]);

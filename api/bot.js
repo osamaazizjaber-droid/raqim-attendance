@@ -169,7 +169,7 @@ async function handleTextMessage(chatId, text) {
   // 1. ربط الطالب
   const { data: linkedStudent, error: linkErr } = await supabase
     .from('students')
-    .select('*, universities(name)')
+    .select('*, colleges(name, university)')
     .eq('telegram_chat_id', chatId)
     .maybeSingle();
 
@@ -183,7 +183,7 @@ async function handleTextMessage(chatId, text) {
     // البحث بالاسم (سواء كان ثلاثياً أو رباعياً) عبر المطابقة الجزئية
     const { data: students, error: searchErr } = await supabase
       .from('students')
-      .select('*, universities(name)')
+      .select('*, colleges(name, university)')
       .ilike('full_name', `${text}%`);
 
     if (searchErr) throw searchErr;
@@ -219,8 +219,8 @@ async function handleTextMessage(chatId, text) {
 
   const isNewLink = !linkedStudent;
   const caption = isNewLink 
-    ? `✅ *تم تفعيل البوت وربطه بحسابك بنجاح!*\n\n*الاسم:* ${targetStudent.full_name}\n*الرقم الجامعي:* ${targetStudent.student_number}\n*الجامعة:* ${targetStudent.universities?.name || 'جامعة رقيم'}\n\n_لقد تم قفل حسابك بالتيليجرام على هذا الرقم الجامعي. في المرات القادمة ستحصل على بطاقتك فوراً بمجرد إرسال أي رسالة للبوت._`
-    : `✅ *مرحباً بك مجدداً! إليك بطاقة الحضور الخاصة بك:*\n\n*الاسم:* ${targetStudent.full_name}\n*الرقم الجامعي:* ${targetStudent.student_number}\n*الجامعة:* ${targetStudent.universities?.name || 'جامعة رقيم'}`;
+    ? `✅ *تم تفعيل البوت وربطه بحسابك بنجاح!*\n\n*الاسم:* ${targetStudent.full_name}\n*الرقم الجامعي:* ${targetStudent.student_number}\n*الجامعة:* ${targetStudent.colleges?.university || 'جامعة رقيم'}\n\n_لقد تم قفل حسابك بالتيليجرام على هذا الرقم الجامعي. في المرات القادمة ستحصل على بطاقتك فوراً بمجرد إرسال أي رسالة للبوت._`
+    : `✅ *مرحباً بك مجدداً! إليك بطاقة الحضور الخاصة بك:*\n\n*الاسم:* ${targetStudent.full_name}\n*الرقم الجامعي:* ${targetStudent.student_number}\n*الجامعة:* ${targetStudent.colleges?.university || 'جامعة رقيم'}`;
 
   if (targetStudent.telegram_file_id) {
     await bot.sendPhoto(chatId, targetStudent.telegram_file_id, {
@@ -245,7 +245,7 @@ async function handleTextMessage(chatId, text) {
         .update({ telegram_file_id: fileId, qr_image_url: null })
         .eq('id', targetStudent.id);
 
-      const path = `${targetStudent.university_id}/${targetStudent.id}.png`;
+      const path = `${targetStudent.college_id}/${targetStudent.id}.png`;
       await supabase.storage.from('qr-cards').remove([path]);
     }
   }
@@ -257,7 +257,7 @@ async function processResendRequest(request) {
     await supabase.from('telegram_resend_requests').update({ status: 'processing' }).eq('id', requestId);
     const { data: student, error: studErr } = await supabase
       .from('students')
-      .select('*, universities(name)')
+      .select('*, colleges(name, university)')
       .eq('id', studentId)
       .single();
 
@@ -269,7 +269,7 @@ async function processResendRequest(request) {
 
 *الاسم:* ${student.full_name}
 *الرقم الجامعي:* ${student.student_number}
-*الجامعة:* ${student.universities?.name || 'جامعة رقيم'}
+*الجامعة:* ${student.colleges?.university || 'جامعة رقيم'}
 
 تم إرسال هذا الكارت بطلب من إدارة النظام.
 `;
@@ -289,7 +289,7 @@ async function processResendRequest(request) {
       const fileId = sentMsg.photo?.[sentMsg.photo.length - 1]?.file_id;
       if (fileId) {
         await supabase.from('students').update({ telegram_file_id: fileId, qr_image_url: null }).eq('id', student.id);
-        const path = `${student.university_id}/${student.id}.png`;
+        const path = `${student.college_id}/${student.id}.png`;
         await supabase.storage.from('qr-cards').remove([path]);
       }
     }
