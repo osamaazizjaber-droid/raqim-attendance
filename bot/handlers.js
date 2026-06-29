@@ -171,6 +171,13 @@ export const handleTextMessage = async (bot, msg) => {
 
         if (resErr) throw resErr;
 
+        // جلب الشهادة الرسمية المرفوعة (إن وجدت)
+        const { data: cert } = await supabase
+          .from('certificates')
+          .select('pdf_url')
+          .eq('student_id', state.studentId)
+          .maybeSingle();
+
         // تنظيف حالة الـ CAPTCHA
         userStates.delete(chatId);
 
@@ -197,6 +204,12 @@ export const handleTextMessage = async (bot, msg) => {
           const badge = gradeIcons[r.grade_label] || r.grade_label;
           resultsText += `• ${r.courses?.name || 'مادة'} ............. ${badge}\n`;
         });
+
+        if (cert?.pdf_url) {
+          resultsText += `\n📜 *رابط تحميل الشهادة الرسمية (PDF):*\n[اضغط هنا لتحميل شهادتك المعتمدة](${cert.pdf_url})`;
+        } else {
+          resultsText += `\n⚠️ *ملاحظة:* لم تصدر شهادتك الورقية الرسمية (PDF) بعد من قبل عمادة الكلية.`;
+        }
 
         await bot.sendMessage(chatId, resultsText, { parse_mode: 'Markdown' });
         return;
