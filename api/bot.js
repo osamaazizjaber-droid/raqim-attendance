@@ -410,21 +410,6 @@ async function handleViewResults(chatId) {
       return;
     }
 
-    // جلب الشهادات المولدة للطالب إن وجدت
-    let certificates = [];
-    try {
-      const { data: certs, error: certErr } = await supabase
-        .from('certificates')
-        .select('*')
-        .eq('student_id', student.id)
-        .order('generated_at', { ascending: true });
-      if (!certErr && certs) {
-        certificates = certs;
-      }
-    } catch (certErr) {
-      console.error('⚠️ Failed to fetch certificates:', certErr);
-    }
-
     // تنسيق وعرض النتائج
     let responseText = `📊 <b>كشف نتائج الامتحانات الرسمي — رقيم</b>\n\n`;
     responseText += `👤 <b>الطالب:</b> ${student.full_name}\n`;
@@ -454,27 +439,21 @@ async function handleViewResults(chatId) {
 
     responseText += `\n💡 <i>ملاحظة: درجة النجاح الصغرى للمواد هي 50.</i>`;
 
-    // تجهيز أزرار التحميل للشهادات المتوفرة في قاعدة البيانات
-    const inlineButtons = [];
-    if (certificates && certificates.length > 0) {
-      certificates.forEach(cert => {
-        if (cert.pdf_url) {
-          inlineButtons.push([
-            {
-              text: `📥 تحميل شهادة عام ${cert.academic_year} (PDF)`,
-              url: cert.pdf_url
-            }
-          ]);
-        }
-      });
-    }
+    // توجيه الزر إلى رابط صفحة النتائج بالمنصة لتوليد وتنزيل ملف PDF حقيقي
+    const frontendUrl = process.env.FRONTEND_URL || 'https://www.sys-wms.pro';
+    const resultsUrl = `${frontendUrl}/results?q=${student.student_number}`;
+    const keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: '📥 تحميل الشهادة (PDF)',
+            url: resultsUrl
+          }
+        ]
+      ]
+    };
 
-    const messageOptions = { parse_mode: 'HTML' };
-    if (inlineButtons.length > 0) {
-      messageOptions.reply_markup = { inline_keyboard: inlineButtons };
-    }
-
-    await bot.sendMessage(chatId, responseText, messageOptions);
+    await bot.sendMessage(chatId, responseText, { parse_mode: 'HTML', reply_markup: keyboard });
   } catch (err) {
     console.error('Error fetching results in serverless bot:', err);
     await bot.sendMessage(chatId, '⚠️ حدث خطأ أثناء جلب نتائج الامتحانات. يرجى المحاولة مرة أخرى لاحقاً.');
