@@ -176,6 +176,13 @@ export default async function handler(req, res) {
           console.error('Failed to answer callback query in serverless:', ansErr);
         }
         await handleViewResults(chatId);
+      } else if (data.startsWith('download_pdf_')) {
+        try {
+          await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery?callback_query_id=${cb.id}&text=${encodeURIComponent('جاري جلب ملف الشهادة... 📥')}`);
+        } catch (ansErr) {
+          console.error('Failed to answer callback query in serverless:', ansErr);
+        }
+        await handleDownloadPdfCallback(chatId, data);
       }
       return res.status(200).json({ success: true });
     }
@@ -410,6 +417,21 @@ async function handleViewResults(chatId) {
       return;
     }
 
+    // جلب الشهادات المولدة للطالب إن وجدت
+    let certificates = [];
+    try {
+      const { data: certs, error: certErr } = await supabase
+        .from('certificates')
+        .select('*')
+        .eq('student_id', student.id)
+        .order('generated_at', { ascending: true });
+      if (!certErr && certs) {
+        certificates = certs;
+      }
+    } catch (certErr) {
+      console.error('⚠️ Failed to fetch certificates:', certErr);
+    }
+
     // تنسيق وعرض النتائج
     let responseText = `📊 <b>كشف نتائج الامتحانات الرسمي — رقيم</b>\n\n`;
     responseText += `👤 <b>الطالب:</b> ${student.full_name}\n`;
@@ -439,24 +461,66 @@ async function handleViewResults(chatId) {
 
     responseText += `\n💡 <i>ملاحظة: درجة النجاح الصغرى للمواد هي 50.</i>`;
 
-    // توجيه الزر إلى رابط صفحة النتائج بالمنصة لتوليد وتنزيل ملف PDF حقيقي
-    const frontendUrl = process.env.FRONTEND_URL || 'https://www.sys-wms.pro';
-    const resultsUrl = `${frontendUrl}/results?q=${student.student_number}`;
-    const keyboard = {
-      inline_keyboard: [
-        [
-          {
-            text: '📥 تحميل الشهادة (PDF)',
-            url: resultsUrl
-          }
-        ]
-      ]
-    };
+    // تجهيز أزرار تحميل الشهادات المتوفرة للتحميل المباشر داخل البوت
+    const inlineButtons = [];
+    if (certificates && certificates.length > 0) {
+      certificates.forEach(cert => {
+        if (cert.pdf_url) {
+          inlineButtons.push([
+            {
+              text: `📥 تحميل شهادة عام ${cert.academic_year} (PDF)`,
+              callback_data: `download_pdf_${cert.academic_year.replace('/', '_')}`
+            }
+          ]);
+        }
+      });
+    }
 
-    await bot.sendMessage(chatId, responseText, { parse_mode: 'HTML', reply_markup: keyboard });
+    const messageOptions = { parse_mode: 'HTML' };
+    if (inlineButtons.length > 0) {
+      messageOptions.reply_markup = { inline_keyboard: inlineButtons };
+    }
+
+    await bot.sendMessage(chatId, responseText, messageOptions);
   } catch (err) {
     console.error('Error fetching results in serverless bot:', err);
     await bot.sendMessage(chatId, '⚠️ حدث خطأ أثناء جلب نتائج الامتحانات. يرجى المحاولة مرة أخرى لاحقاً.');
+  }
+}
+
+async function handleDownloadPdfCallback(chatId, data) {
+  try {
+    const academicYear = data.replace('download_pdf_', '').replace('_', '/');
+    const student = await getStudentByChatId(chatId);
+    if (!student) {
+      await bot.sendMessage(chatId, '❌ لم يتم ربط حسابك بالبوت بعد.');
+      return;
+    }
+
+    await bot.sendChatAction(chatId, 'upload_document');
+
+    const { data: cert, error } = await supabase
+      .from('certificates')
+      .select('*')
+      .eq('student_id', student.id)
+      .eq('academic_year', academicYear)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!cert || !cert.pdf_url) {
+      await bot.sendMessage(chatId, `⚠️ لم يتم إصدار شهادة PDF للعام الدراسي ${academicYear} بعد من قبل إدارة الكلية.`);
+      return;
+    }
+
+    // إرسال ملف الـ PDF مباشرة داخل المحادثة
+    await bot.sendDocument(chatId, cert.pdf_url, {
+      caption: `📄 <b>الشهادة الأكاديمية الرسمية للعام الدراسي: ${cert.academic_year}</b>\n• التقدير العام: <b>${cert.overall_grade}</b>\n• الحالة: <b>${cert.is_passed ? 'ناجح 🎉' : 'راسب ❌'}</b>`,
+      parse_mode: 'HTML'
+    });
+  } catch (err) {
+    console.error('Error in handleDownloadPdfCallback in serverless bot:', err);
+    await bot.sendMessage(chatId, '⚠️ حدث خطأ أثناء جلب وتحميل ملف الشهادة. يرجى المحاولة مرة أخرى لاحقاً.');
   }
 }
 
