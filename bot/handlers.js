@@ -266,6 +266,21 @@ export const handleViewResults = async (bot, chatId) => {
       return;
     }
 
+    // جلب الشهادات المولدة للطالب إن وجدت
+    let certificates = [];
+    try {
+      const { data: certs, error: certErr } = await supabase
+        .from('certificates')
+        .select('*')
+        .eq('student_id', student.id)
+        .order('generated_at', { ascending: true });
+      if (!certErr && certs) {
+        certificates = certs;
+      }
+    } catch (certErr) {
+      console.error('⚠️ Failed to fetch certificates:', certErr);
+    }
+
     // تنسيق وعرض النتائج
     let responseText = `📊 <b>كشف نتائج الامتحانات الرسمي — رقيم</b>\n\n`;
     responseText += `👤 <b>الطالب:</b> ${student.full_name}\n`;
@@ -296,6 +311,23 @@ export const handleViewResults = async (bot, chatId) => {
     responseText += `\n💡 <i>ملاحظة: درجة النجاح الصغرى للمواد هي 50.</i>`;
 
     await bot.sendMessage(chatId, responseText, { parse_mode: 'HTML' });
+
+    // إرسال الشهادات بصيغة PDF إن وجدت
+    if (certificates && certificates.length > 0) {
+      for (const cert of certificates) {
+        if (cert.pdf_url) {
+          try {
+            await bot.sendChatAction(chatId, 'upload_document');
+            await bot.sendDocument(chatId, cert.pdf_url, {
+              caption: `📄 <b>الشهادة الأكاديمية الرسمية للعام الدراسي: ${cert.academic_year}</b>\n• التقدير العام: <b>${cert.overall_grade}</b>\n• الحالة: <b>${cert.is_passed ? 'ناجح 🎉' : 'راسب ❌'}</b>`,
+              parse_mode: 'HTML'
+            });
+          } catch (docErr) {
+            console.error(`Failed to send certificate PDF for year ${cert.academic_year}:`, docErr.message || docErr);
+          }
+        }
+      }
+    }
   } catch (err) {
     console.error('Error fetching results in bot:', err);
     await bot.sendMessage(chatId, '⚠️ حدث خطأ أثناء جلب نتائج الامتحانات. يرجى المحاولة مرة أخرى لاحقاً.');
