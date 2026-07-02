@@ -3,7 +3,8 @@ import dotenv from 'dotenv';
 import http from 'http';
 import dns from 'dns';
 import { supabase } from './supabase.js';
-import { handleStart, handleHelp, handleTextMessage } from './handlers.js';
+import { handleStart, handleHelp, handleTextMessage, handleCallbackQuery } from './handlers.js';
+import { initStudentCache, updateStudentInCache, removeStudentFromCache } from './studentCache.js';
 
 // إجبار Node.js على تفضيل IPv4 لتفادي مشاكل الاتصال المعلق في بعض بيئات Docker (Hugging Face)
 if (dns.setDefaultResultOrder) {
@@ -76,9 +77,22 @@ bot.on('message', (msg) => {
   handleTextMessage(bot, msg);
 });
 
-// بدء الاستطلاع يدوياً بعد تسجيل كافة المستمعين
-console.log('🔄 البدء الفعلي للاستطلاع (Manual Polling Start)...');
-bot.startPolling();
+// تسجيل مستمع للـ Callback Queries (الأزرار التفاعلية)
+bot.on('callback_query', (callbackQuery) => {
+  console.log(`📥 [Callback Query] received from ${callbackQuery.from?.username || callbackQuery.from?.id}: "${callbackQuery.data}"`);
+  handleCallbackQuery(bot, callbackQuery);
+});
+
+// تهيئة ذاكرة التخزين المؤقت للطلاب عند البدء ومن ثم تفعيل الاستطلاع
+initStudentCache()
+  .then(() => {
+    console.log('🔄 البدء الفعلي للاستطلاع (Manual Polling Start)...');
+    bot.startPolling();
+  })
+  .catch(err => {
+    console.error('⚠️ فشل تهيئة ذاكرة التخزين المؤقت للطلاب عند الإقلاع، بدء الاستطلاع على كل حال:', err);
+    bot.startPolling();
+  });
 
 /**
  * وظيفة لمعالجة طلب إعادة إرسال كود QR وتحديث قاعدة البيانات.
@@ -328,6 +342,42 @@ supabase
     async (payload) => {
       console.log('🔔 استقبلنا طلب إعادة إرسال كرت جديد عبر Realtime:', payload.new.id);
       await processResendRequest(payload.new);
+    }
+  )
+  .subscribe();
+
+// الاشتراك اللحظي في تحديثات جدول الطلاب لمزامنة ذاكرة التخزين المؤقت (Cache Sync)
+supabase
+  .channel('students_cache_sync')
+  .on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'students',
+    },
+    async (payload) => {
+      console.log(`🔔 استقبلنا تحديثاً لجدول الطلاب عبر Realtime: ${payload.eventType}`);
+      const { eventType, new: newRecord, old: oldRecord } = payload;
+      
+      if (eventType === 'DELETE') {
+        removeStudentFromCache(oldRecord.id);
+      } else {
+        try {
+          const { data, error } = await supabase
+            .from('students')
+            .select('*, colleges(name, university), departments(name), stages(name)')
+            .eq('id', newRecord.id)
+            .single();
+            
+          if (error) throw error;
+          if (data) {
+            updateStudentInCache(data);
+          }
+        } catch (err) {
+          console.error('❌ فشل جلب تفاصيل الطالب لتحديث الكاش:', err);
+        }
+      }
     }
   )
   .subscribe();

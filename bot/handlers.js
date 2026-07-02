@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { getStudentByChatId, getStudentByNumber, searchStudentsByName, updateStudentInCache } from './studentCache.js';
 
 // الترحيب باللغة العربية
 export const handleStart = async (bot, msg) => {
@@ -36,6 +37,13 @@ export const handleTextMessage = async (bot, msg) => {
 
   // نتجاهل الأوامر الرسمية التي تبدأ بـ /start أو /help لأنها تُعالج في مستمعيها الخاصين
   if (text.startsWith('/start') || text.startsWith('/help')) return;
+
+  // تحقق من الكلمات المفتاحية لعرض النتائج
+  const resultsKeywords = ['النتائج', 'نتائج', 'نتائجي', '/results', 'results', 'النتيجه', 'نتيجه', 'نتيجة'];
+  if (resultsKeywords.includes(text.toLowerCase())) {
+    await handleViewResults(bot, chatId);
+    return;
+  }
 
   try {
     // 2. التحقق مما إذا كان المدخل بريداً إلكترونياً (للأستاذ)
@@ -91,37 +99,20 @@ export const handleTextMessage = async (bot, msg) => {
     const searchText = text.trim();
     let student = null;
 
-    // 0. التحقق أولاً مما إذا كان حساب التيليجرام هذا مرتبطاً بالفعل بطالب مسجل
-    const { data: linkedStudent, error: linkedErr } = await supabase
-      .from('students')
-      .select('*, colleges(name, university), departments(name)')
-      .eq('telegram_chat_id', chatId)
-      .maybeSingle();
-
-    if (linkedErr) throw linkedErr;
+    // 0. التحقق أولاً مما إذا كان حساب التيليجرام هذا مرتبطاً بالفعل بطالب مسجل (من الكاش)
+    const linkedStudent = await getStudentByChatId(chatId);
 
     if (linkedStudent) {
       student = linkedStudent;
     } else {
-      // 1. محاولة البحث أولاً بمطابقة الرقم الجامعي بدقة
-      const { data: studentByNum, error: numErr } = await supabase
-        .from('students')
-        .select('*, colleges(name, university), departments(name)')
-        .eq('student_number', searchText)
-        .maybeSingle();
-
-      if (numErr) throw numErr;
+      // 1. محاولة البحث أولاً بمطابقة الرقم الجامعي بدقة (من الكاش)
+      const studentByNum = await getStudentByNumber(searchText);
 
       if (studentByNum) {
         student = studentByNum;
       } else {
-        // 2. إذا لم يعثر عليه بالرقم، نبحث بالاسم الثلاثي (بحث جزئي ذكي)
-        const { data: studentsByName, error: nameErr } = await supabase
-          .from('students')
-          .select('*, colleges(name, university), departments(name)')
-          .ilike('full_name', `%${searchText}%`);
-
-        if (nameErr) throw nameErr;
+        // 2. إذا لم يعثر عليه بالرقم، نبحث بالاسم الثلاثي (من الكاش)
+        const studentsByName = await searchStudentsByName(searchText);
 
         if (studentsByName && studentsByName.length > 0) {
           if (studentsByName.length === 1) {
@@ -159,16 +150,27 @@ export const handleTextMessage = async (bot, msg) => {
         .update({ telegram_chat_id: chatId })
         .eq('id', student.id);
       student.telegram_chat_id = chatId;
+      updateStudentInCache(student);
     }
 
     const frontendUrl = process.env.FRONTEND_URL || 'https://www.sys-wms.pro';
-    const caption = `✅ <b>إليك بطاقة الحضور الرسمية الخاصة بك:</b>\n\n<b>الاسم:</b> ${student.full_name}\n<b>الرقم الجامعي:</b> ${student.student_number}\n<b>الجامعة:</b> ${student.colleges?.university || 'جامعة رقيم'}\n<b>الكلية:</b> ${student.colleges?.name || 'الكلية'}\n\n<i>احفظ هذه الصورة بجهازك لتتمكن من تسجيل حضورك بدون إنترنت بمسحها بواسطة جهاز الأستاذ.</i>\n\n📊 <b>للاستعلام عن نتائج امتحاناتك وتحميل شهادتك الرسمية:</b>\n<a href="${frontendUrl}/results">اضغط هنا لفتح بوابة النتائج وتنزيل الشهادة</a>\n<i>(يرجى إدخال رقمك الجامعي وحل مسألة التحقق الرياضية البسيطة التي ستظهر لك لاستلام النتيجة وتنزيل الشهادة)</i>`;
+    const caption = `✅ <b>إليك بطاقة الحضور الرسمية الخاصة بك:</b>\n\n<b>الاسم:</b> ${student.full_name}\n<b>الرقم الجامعي:</b> ${student.student_number}\n<b>الجامعة:</b> ${student.colleges?.university || 'جامعة رقيم'}\n<b>الكلية:</b> ${student.colleges?.name || 'الكلية'}\n\n<i>احفظ هذه الصورة بجهازك لتتمكن من تسجيل حضورك بدون إنترنت بمسحها بواسطة جهاز الأستاذ.</i>`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: '📊 عرض نتائج الامتحانات بالبوت', callback_data: 'view_results' },
+          { text: '🌐 بوابة النتائج (الويب)', url: `${frontendUrl}/results?q=${student.student_number}` }
+        ]
+      ]
+    };
 
     if (student.telegram_file_id) {
       // إرسال كاش تيليجرام
       await bot.sendPhoto(chatId, student.telegram_file_id, {
         caption: caption,
-        parse_mode: 'HTML'
+        parse_mode: 'HTML',
+        reply_markup: keyboard
       });
     } else {
       if (!student.qr_image_url) {
@@ -179,7 +181,8 @@ export const handleTextMessage = async (bot, msg) => {
       // إرسال من رابط سوبابيس لأول مرة
       const sentMsg = await bot.sendPhoto(chatId, student.qr_image_url, {
         caption: caption,
-        parse_mode: 'HTML'
+        parse_mode: 'HTML',
+        reply_markup: keyboard
       });
 
       const fileId = sentMsg.photo?.[sentMsg.photo.length - 1]?.file_id;
@@ -193,6 +196,10 @@ export const handleTextMessage = async (bot, msg) => {
             qr_image_url: null 
           })
           .eq('id', student.id);
+
+        student.telegram_file_id = fileId;
+        student.qr_image_url = null;
+        updateStudentInCache(student);
 
         const path = `${student.college_id}/${student.id}.png`;
         await supabase.storage
@@ -210,5 +217,87 @@ export const handleTextMessage = async (bot, msg) => {
     } catch (sendErr) {
       console.error('Failed to send error fallback message to user:', sendErr.message || sendErr);
     }
+  }
+};
+
+/**
+ * معالجة الاستعلامات التفاعلية (Callback Queries) من الأزرار
+ */
+export const handleCallbackQuery = async (bot, callbackQuery) => {
+  const chatId = callbackQuery.message.chat.id;
+  const data = callbackQuery.data;
+
+  if (data === 'view_results') {
+    try {
+      // إجابة التنبيه التفاعلي لإنهاء حالة التحميل
+      await bot.answerCallbackQuery(callbackQuery.id);
+    } catch (ansErr) {
+      console.warn('⚠️ Failed to answer callback query (non-fatal):', ansErr.message);
+    }
+    await handleViewResults(bot, chatId);
+  }
+};
+
+/**
+ * جلب وعرض نتائج الامتحانات الرسمية للطالب داخل البوت
+ */
+export const handleViewResults = async (bot, chatId) => {
+  try {
+    await bot.sendChatAction(chatId, 'typing');
+
+    // جلب بيانات الطالب من الكاش الميموري
+    const student = await getStudentByChatId(chatId);
+    if (!student) {
+      await bot.sendMessage(chatId, '❌ لم يتم ربط حسابك بالبوت بعد. يرجى إرسال رقمك الجامعي أو اسمك الكامل أولاً لتفعيل حسابك.');
+      return;
+    }
+
+    // جلب درجات الطالب من قاعدة البيانات
+    const { data: results, error: resErr } = await supabase
+      .from('results')
+      .select('*, courses(name)')
+      .eq('student_id', student.id)
+      .order('created_at', { ascending: true });
+
+    if (resErr) throw resErr;
+
+    if (!results || results.length === 0) {
+      await bot.sendMessage(chatId, `ℹ️ <b>لا توجد نتائج معلنة لك حالياً في النظام.</b>\n\n👤 <b>الاسم:</b> ${student.full_name}\n🆔 <b>الرقم الجامعي:</b> ${student.student_number}`, { parse_mode: 'HTML' });
+      return;
+    }
+
+    // تنسيق وعرض النتائج
+    let responseText = `📊 <b>كشف نتائج الامتحانات الرسمي — رقيم</b>\n\n`;
+    responseText += `👤 <b>الطالب:</b> ${student.full_name}\n`;
+    responseText += `🆔 <b>الرقم الجامعي:</b> ${student.student_number}\n`;
+    responseText += `🏫 <b>الجامعة والكلية:</b> ${student.colleges?.university || 'جامعة رقيم'} - ${student.colleges?.name || '-'}\n`;
+    responseText += `🎓 <b>القسم والمرحلة:</b> ${student.departments?.name || '-'} (${student.stages?.name || 'المرحلة الدراسية'})\n`;
+    responseText += `──────────────────\n`;
+
+    // تجميع النتائج حسب العام الدراسي
+    const resultsByYear = {};
+    results.forEach(res => {
+      if (!resultsByYear[res.academic_year]) {
+        resultsByYear[res.academic_year] = [];
+      }
+      resultsByYear[res.academic_year].push(res);
+    });
+
+    for (const year of Object.keys(resultsByYear)) {
+      responseText += `📅 <b>العام الدراسي: ${year}</b>\n\n`;
+      resultsByYear[year].forEach((res, index) => {
+        const score = parseFloat(res.score);
+        const statusEmoji = score >= 50 ? '🟢' : '🔴';
+        responseText += `${statusEmoji} ${index + 1}. <b>${res.courses?.name || 'مادة'}</b>: <code>${score}</code> (${res.grade_label})\n`;
+      });
+      responseText += `──────────────────\n`;
+    }
+
+    responseText += `\n💡 <i>ملاحظة: درجة النجاح الصغرى للمواد هي 50.</i>`;
+
+    await bot.sendMessage(chatId, responseText, { parse_mode: 'HTML' });
+  } catch (err) {
+    console.error('Error fetching results in bot:', err);
+    await bot.sendMessage(chatId, '⚠️ حدث خطأ أثناء جلب نتائج الامتحانات. يرجى المحاولة مرة أخرى لاحقاً.');
   }
 };

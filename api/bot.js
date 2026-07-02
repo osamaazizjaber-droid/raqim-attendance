@@ -13,6 +13,79 @@ if (!token || !supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const bot = new TelegramBot(token, { polling: false });
 
+// --- ذاكرة تخزين مؤقت خفيفة الوزن للبيئة غير الدائمة (Serverless Cache) ---
+let studentsList = null;
+let cacheByChatId = new Map();
+let cacheByStudentNumber = new Map();
+let lastFetchTime = 0;
+const CACHE_TTL = 60000; // دقيقة واحدة صلاحية الكاش لتجنب تكرار الاتصال بـ Supabase
+
+async function initServerlessCache() {
+  const now = Date.now();
+  if (studentsList && (now - lastFetchTime < CACHE_TTL)) {
+    return;
+  }
+  try {
+    console.log('🔄 [Serverless Cache] جاري تنشيط ذاكرة التخزين المؤقت للطلاب...');
+    const { data, error } = await supabase
+      .from('students')
+      .select('*, colleges(name, university), departments(name), stages(name)');
+      
+    if (error) throw error;
+    
+    studentsList = data || [];
+    cacheByChatId.clear();
+    cacheByStudentNumber.clear();
+    
+    for (const student of studentsList) {
+      if (student.telegram_chat_id) {
+        cacheByChatId.set(String(student.telegram_chat_id), student);
+      }
+      if (student.student_number) {
+        cacheByStudentNumber.set(student.student_number.trim().toUpperCase(), student);
+      }
+    }
+    lastFetchTime = now;
+    console.log(`✅ [Serverless Cache] تم كشط ${studentsList.length} طالب بنجاح.`);
+  } catch (err) {
+    console.error('❌ [Serverless Cache] فشل تنشيط كاش الطلاب:', err);
+    if (!studentsList) throw err;
+  }
+}
+
+async function getStudentByChatId(chatId) {
+  await initServerlessCache();
+  return cacheByChatId.get(String(chatId)) || null;
+}
+
+async function getStudentByNumber(studentNumber) {
+  await initServerlessCache();
+  if (!studentNumber) return null;
+  return cacheByStudentNumber.get(studentNumber.trim().toUpperCase()) || null;
+}
+
+async function searchStudentsByName(name) {
+  await initServerlessCache();
+  if (!name) return [];
+  const normalized = name.trim().toLowerCase();
+  return studentsList.filter(s => s.full_name && s.full_name.toLowerCase().includes(normalized));
+}
+
+function updateStudentInCache(student) {
+  if (!studentsList) return;
+  const index = studentsList.findIndex(s => s.id === student.id);
+  if (index !== -1) {
+    const old = studentsList[index];
+    if (old.telegram_chat_id) cacheByChatId.delete(String(old.telegram_chat_id));
+    if (old.student_number) cacheByStudentNumber.delete(old.student_number.trim().toUpperCase());
+    studentsList[index] = student;
+  } else {
+    studentsList.push(student);
+  }
+  if (student.telegram_chat_id) cacheByChatId.set(String(student.telegram_chat_id), student);
+  if (student.student_number) cacheByStudentNumber.set(student.student_number.trim().toUpperCase(), student);
+}
+
 export default async function handler(req, res) {
   // 1. معالجة طلب GET لتهيئة وإعداد الـ Webhook تلقائياً
   if (req.method === 'GET') {
@@ -90,7 +163,24 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
-    // ب) التحقق مما إذا كان الطلب تحديثاً مرسلاً من تيليجرام (Telegram Webhook Update)
+    // ب) التحقق مما إذا كان الطلب استعلام callback من زر تفاعلي (Telegram Callback Query)
+    if (body && body.callback_query) {
+      const cb = body.callback_query;
+      const chatId = cb.message.chat.id;
+      const data = cb.data;
+      
+      if (data === 'view_results') {
+        try {
+          await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery?callback_query_id=${cb.id}`);
+        } catch (ansErr) {
+          console.error('Failed to answer callback query in serverless:', ansErr);
+        }
+        await handleViewResults(chatId);
+      }
+      return res.status(200).json({ success: true });
+    }
+
+    // ج) التحقق مما إذا كان الطلب تحديثاً مرسلاً من تيليجرام (Telegram Webhook Update)
     if (body && body.message) {
       const msg = body.message;
       const chatId = msg.chat.id;
@@ -145,6 +235,13 @@ async function handleHelp(chatId) {
 async function handleTextMessage(chatId, text) {
   if (text.startsWith('/')) return;
 
+  // تحقق من الكلمات المفتاحية لعرض النتائج
+  const resultsKeywords = ['النتائج', 'نتائج', 'نتائجي', '/results', 'results', 'النتيجه', 'نتيجه', 'نتيجة'];
+  if (resultsKeywords.includes(text.toLowerCase())) {
+    await handleViewResults(chatId);
+    return;
+  }
+
   // 0. التحقق مما إذا كان المدخل بريداً إلكترونياً (للأستاذ)
   if (text.includes('@')) {
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -189,55 +286,50 @@ async function handleTextMessage(chatId, text) {
     return;
   }
 
-  // 1. ربط الطالب
-  const { data: linkedStudent, error: linkErr } = await supabase
-    .from('students')
-    .select('*, colleges(name, university)')
-    .eq('telegram_chat_id', chatId)
-    .maybeSingle();
-
-  if (linkErr) throw linkErr;
-
+  // 1. ربط الطالب (من الكاش)
+  const linkedStudent = await getStudentByChatId(chatId);
   let targetStudent = null;
 
   if (linkedStudent) {
     targetStudent = linkedStudent;
   } else {
-    // البحث بالاسم (سواء كان ثلاثياً أو رباعياً) عبر المطابقة الجزئية
-    const { data: students, error: searchErr } = await supabase
-      .from('students')
-      .select('*, colleges(name, university)')
-      .ilike('full_name', `${text}%`);
+    // محاولة البحث بالرقم الجامعي أولاً (من الكاش)
+    const studentByNum = await getStudentByNumber(text);
+    
+    if (studentByNum) {
+      targetStudent = studentByNum;
+    } else {
+      // البحث بالاسم عبر المطابقة الجزئية الذكية (من الكاش)
+      const students = await searchStudentsByName(text);
 
-    if (searchErr) throw searchErr;
+      if (!students || students.length === 0) {
+        await bot.sendMessage(chatId, '❌ الاسم أو الرقم الجامعي غير موجود بقاعدة البيانات. يرجى كتابته بدقة كما هو مسجل بالمنصة، أو مراجعة إدارة التسجيل والقبول.');
+        return;
+      }
 
-    if (!students || students.length === 0) {
-      await bot.sendMessage(chatId, '❌ الاسم غير موجود بقاعدة البيانات. يرجى كتابة اسمك بدقة كما هو مسجل بالمنصة، أو مراجعة إدارة التسجيل والقبول.');
-      return;
+      if (students.length > 1) {
+        const matchesList = students.slice(0, 3).map(s => `• ${s.full_name}`).join('\n');
+        await bot.sendMessage(chatId, `⚠️ تم العثور على أكثر من طالب يطابق هذا الاسم:\n${matchesList}\n\nيرجى كتابة الاسم الرباعي الكامل بدقة أو البحث برقمك الجامعي.`);
+        return;
+      }
+
+      targetStudent = students[0];
     }
 
-    if (students.length > 1) {
-      const matchesList = students.slice(0, 3).map(s => `• ${s.full_name}`).join('\n');
-      await bot.sendMessage(chatId, `⚠️ تم العثور على أكثر من طالب يطابق هذا الاسم:\n${matchesList}\n\nيرجى كتابة اسمك الرباعي الكامل بدقة لتفعيل حسابك.`);
-      return;
-    }
-
-    const student = students[0];
-
-    if (student.telegram_chat_id && student.telegram_chat_id !== chatId) {
-      await bot.sendMessage(chatId, '⚠️ هذا الاسم مرتبط بحساب تيليجرام آخر بالفعل. يرجى مراجعة إدارة الكلية لإعادة تعيينه.');
+    if (targetStudent.telegram_chat_id && targetStudent.telegram_chat_id !== chatId) {
+      await bot.sendMessage(chatId, '⚠️ هذا الحساب مرتبط بحساب تيليجرام آخر بالفعل لمنع التزوير وحماية الخصوصية. يرجى مراجعة الإدارة.');
       return;
     }
 
     const { error: updateErr } = await supabase
       .from('students')
       .update({ telegram_chat_id: chatId })
-      .eq('id', student.id);
+      .eq('id', targetStudent.id);
 
     if (updateErr) throw updateErr;
 
-    student.telegram_chat_id = chatId;
-    targetStudent = student;
+    targetStudent.telegram_chat_id = chatId;
+    updateStudentInCache(targetStudent);
   }
 
   const isNewLink = !linkedStudent;
@@ -245,11 +337,14 @@ async function handleTextMessage(chatId, text) {
     ? `✅ *تم تفعيل البوت وربطه بحسابك بنجاح!*\n\n*الاسم:* ${targetStudent.full_name}\n*الرقم الجامعي:* ${targetStudent.student_number}\n*الجامعة:* ${targetStudent.colleges?.university || 'جامعة رقيم'}\n\n_لقد تم قفل حسابك بالتيليجرام على هذا الرقم الجامعي. في المرات القادمة ستحصل على بطاقتك فوراً بمجرد إرسال أي رسالة للبوت._`
     : `✅ *مرحباً بك مجدداً! إليك بطاقة الحضور الخاصة بك:*\n\n*الاسم:* ${targetStudent.full_name}\n*الرقم الجامعي:* ${targetStudent.student_number}\n*الجامعة:* ${targetStudent.colleges?.university || 'جامعة رقيم'}`;
 
-  // رابط صفحة النتائج كزر أسفل الرسالة
+  // أزرار النتائج
   const resultsUrl = `https://www.sys-wms.pro/results?q=${targetStudent.student_number}`;
   const keyboard = {
     inline_keyboard: [
-      [{ text: '📊 عرض نتائج الامتحانات', url: resultsUrl }]
+      [
+        { text: '📊 عرض نتائج الامتحانات بالبوت', callback_data: 'view_results' },
+        { text: '🌐 بوابة النتائج (الويب)', url: resultsUrl }
+      ]
     ]
   };
 
@@ -280,9 +375,74 @@ async function handleTextMessage(chatId, text) {
         .update({ telegram_file_id: fileId, qr_image_url: null })
         .eq('id', targetStudent.id);
 
+      targetStudent.telegram_file_id = fileId;
+      targetStudent.qr_image_url = null;
+      updateStudentInCache(targetStudent);
+
       const path = `${targetStudent.college_id}/${targetStudent.id}.png`;
       await supabase.storage.from('qr-cards').remove([path]);
     }
+  }
+}
+
+async function handleViewResults(chatId) {
+  try {
+    await bot.sendChatAction(chatId, 'typing');
+
+    // جلب بيانات الطالب من الكاش الميموري
+    const student = await getStudentByChatId(chatId);
+    if (!student) {
+      await bot.sendMessage(chatId, '❌ لم يتم ربط حسابك بالبوت بعد. يرجى إرسال رقمك الجامعي أو اسمك الكامل أولاً لتفعيل حسابك.');
+      return;
+    }
+
+    // جلب درجات الطالب من قاعدة البيانات
+    const { data: results, error: resErr } = await supabase
+      .from('results')
+      .select('*, courses(name)')
+      .eq('student_id', student.id)
+      .order('created_at', { ascending: true });
+
+    if (resErr) throw resErr;
+
+    if (!results || results.length === 0) {
+      await bot.sendMessage(chatId, `ℹ️ <b>لا توجد نتائج معلنة لك حالياً في النظام.</b>\n\n👤 <b>الاسم:</b> ${student.full_name}\n🆔 <b>الرقم الجامعي:</b> ${student.student_number}`, { parse_mode: 'HTML' });
+      return;
+    }
+
+    // تنسيق وعرض النتائج
+    let responseText = `📊 <b>كشف نتائج الامتحانات الرسمي — رقيم</b>\n\n`;
+    responseText += `👤 <b>الطالب:</b> ${student.full_name}\n`;
+    responseText += `🆔 <b>الرقم الجامعي:</b> ${student.student_number}\n`;
+    responseText += `🏫 <b>الجامعة والكلية:</b> ${student.colleges?.university || 'جامعة رقيم'} - ${student.colleges?.name || '-'}\n`;
+    responseText += `🎓 <b>القسم والمرحلة:</b> ${student.departments?.name || '-'} (${student.stages?.name || 'المرحلة الدراسية'})\n`;
+    responseText += `──────────────────\n`;
+
+    // تجميع النتائج حسب العام الدراسي
+    const resultsByYear = {};
+    results.forEach(res => {
+      if (!resultsByYear[res.academic_year]) {
+        resultsByYear[res.academic_year] = [];
+      }
+      resultsByYear[res.academic_year].push(res);
+    });
+
+    for (const year of Object.keys(resultsByYear)) {
+      responseText += `📅 <b>العام الدراسي: ${year}</b>\n\n`;
+      resultsByYear[year].forEach((res, index) => {
+        const score = parseFloat(res.score);
+        const statusEmoji = score >= 50 ? '🟢' : '🔴';
+        responseText += `${statusEmoji} ${index + 1}. <b>${res.courses?.name || 'مادة'}</b>: <code>${score}</code> (${res.grade_label})\n`;
+      });
+      responseText += `──────────────────\n`;
+    }
+
+    responseText += `\n💡 <i>ملاحظة: درجة النجاح الصغرى للمواد هي 50.</i>`;
+
+    await bot.sendMessage(chatId, responseText, { parse_mode: 'HTML' });
+  } catch (err) {
+    console.error('Error fetching results in serverless bot:', err);
+    await bot.sendMessage(chatId, '⚠️ حدث خطأ أثناء جلب نتائج الامتحانات. يرجى المحاولة مرة أخرى لاحقاً.');
   }
 }
 
