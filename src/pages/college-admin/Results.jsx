@@ -199,7 +199,7 @@ export default function CollegeAdminResults() {
           collegeLogoUrl,
         });
 
-        const path = `certificates/${student.id}/${academicYear.replace('/', '_')}.pdf`;
+        const path = `${student.id}/${academicYear.replace('/', '_')}.pdf`;
         await supabase.storage
           .from('certificates')
           .upload(path, pdfBlob, {
@@ -563,7 +563,7 @@ export default function CollegeAdminResults() {
         });
 
         // 3. ارفع PDF لـ Supabase Storage
-        const path = `certificates/${student.id}/${selectedYear.replace('/', '_')}.pdf`;
+        const path = `${student.id}/${selectedYear.replace('/', '_')}.pdf`;
         const { error: uploadErr } = await supabase.storage
           .from('certificates')
           .upload(path, pdfBlob, {
