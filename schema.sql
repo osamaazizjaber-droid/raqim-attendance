@@ -78,7 +78,7 @@ CREATE TABLE courses (
     name text NOT NULL,
     department_id uuid REFERENCES departments(id) ON DELETE CASCADE,
     stage_id uuid REFERENCES stages(id) ON DELETE CASCADE,
-    units int DEFAULT 1,
+    units numeric DEFAULT 1,
     created_at timestamptz DEFAULT now()
 );
 

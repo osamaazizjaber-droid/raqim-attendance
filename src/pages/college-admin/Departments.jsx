@@ -156,7 +156,7 @@ export default function CollegeAdminDepartments() {
           .update({ 
             name: courseForm.name, 
             stage_id: courseForm.stage_id,
-            units: parseInt(courseForm.units) || 1
+            units: parseFloat(courseForm.units) || 1
           })
           .eq('id', courseForm.id);
         if (error) throw error;
@@ -169,7 +169,7 @@ export default function CollegeAdminDepartments() {
             name: courseForm.name,
             stage_id: courseForm.stage_id,
             department_id: selectedDept.id,
-            units: parseInt(courseForm.units) || 1
+            units: parseFloat(courseForm.units) || 1
           });
         if (error) throw error;
         showToast('نجاح', 'تم إضافة المادة الدراسية بنجاح', 'success');
@@ -382,6 +382,7 @@ export default function CollegeAdminDepartments() {
               <label className={compStyles.label}>عدد الوحدات (Units)</label>
               <input 
                 type="number" 
+                step="any"
                 min="1"
                 max="10"
                 required
