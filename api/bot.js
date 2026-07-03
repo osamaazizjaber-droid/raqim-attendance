@@ -424,7 +424,7 @@ async function handleViewResults(chatId) {
         .from('certificates')
         .select('*')
         .eq('student_id', student.id)
-        .order('generated_at', { ascending: true });
+        .order('generated_at', { ascending: false });
       if (!certErr && certs) {
         certificates = certs;
       }
@@ -513,10 +513,22 @@ async function handleDownloadPdfCallback(chatId, data) {
       return;
     }
 
-    // إرسال ملف الـ PDF مباشرة داخل المحادثة
-    await bot.sendDocument(chatId, cert.pdf_url, {
+    // تحميل ملف الـ PDF على الخادم أولاً ثم إرساله كـ Buffer لتجنب مشاكل Telegram مع روابط Supabase وتجنب الكاش
+    const pdfResponse = await fetch(`${cert.pdf_url}?t=${Date.now()}`);
+    if (!pdfResponse.ok) {
+      throw new Error(`Failed to fetch PDF: ${pdfResponse.status} ${pdfResponse.statusText}`);
+    }
+    const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+
+    const fileName = `شهادة_${student.full_name?.replace(/\s+/g, '_') || 'الطالب'}_${cert.academic_year.replace('/', '-')}.pdf`;
+
+    // إرسال ملف الـ PDF مباشرة داخل المحادثة كـ Buffer لضمان عدم تقديم نسخة قديمة مخزنة مؤقتاً
+    await bot.sendDocument(chatId, pdfBuffer, {
       caption: `📄 <b>الشهادة الأكاديمية الرسمية للعام الدراسي: ${cert.academic_year}</b>\n• التقدير العام: <b>${cert.overall_grade}</b>\n• الحالة: <b>${cert.is_passed ? 'ناجح 🎉' : 'راسب ❌'}</b>`,
       parse_mode: 'HTML'
+    }, {
+      filename: fileName,
+      contentType: 'application/pdf'
     });
   } catch (err) {
     console.error('Error in handleDownloadPdfCallback in serverless bot:', err);

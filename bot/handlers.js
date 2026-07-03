@@ -292,7 +292,7 @@ export const handleViewResults = async (bot, chatId) => {
         .from('certificates')
         .select('*')
         .eq('student_id', student.id)
-        .order('generated_at', { ascending: true });
+        .order('generated_at', { ascending: false });
       if (!certErr && certs) {
         certificates = certs;
       }
@@ -384,8 +384,8 @@ export const handleDownloadPdfCallback = async (bot, chatId, data) => {
       return;
     }
 
-    // تحميل ملف الـ PDF على الخادم أولاً ثم إرساله كـ Buffer لتجنب مشاكل Telegram مع روابط Supabase
-    const pdfResponse = await fetch(cert.pdf_url);
+    // تحميل ملف الـ PDF على الخادم أولاً ثم إرساله كـ Buffer لتجنب مشاكل Telegram مع روابط Supabase وتجنب الكاش
+    const pdfResponse = await fetch(`${cert.pdf_url}?t=${Date.now()}`);
     if (!pdfResponse.ok) {
       throw new Error(`Failed to fetch PDF: ${pdfResponse.status} ${pdfResponse.statusText}`);
     }
