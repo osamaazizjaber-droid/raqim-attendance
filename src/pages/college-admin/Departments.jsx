@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit, Folder, School, PlusCircle } from 'lucide-react';
+import { Plus, Trash2, Edit, Folder, School, PlusCircle, Download } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../components/ui/Toast';
 import { Button } from '../../components/ui/Button';
@@ -10,6 +10,7 @@ import { CollegeAdminSidebar } from './Dashboard';
 import styles from '../../styles/admin.module.css';
 import compStyles from '../../styles/components.module.css';
 import { useAuth } from '../../hooks/useAuth';
+import { exportToExcel } from '../../lib/exportUtils';
 
 export default function CollegeAdminDepartments() {
   const { showToast } = useToast();
@@ -194,6 +195,21 @@ export default function CollegeAdminDepartments() {
     }
   };
 
+  const handleDownloadCourses = () => {
+    if (courses.length === 0) return;
+    const exportData = courses.map(course => ({
+      name: course.name,
+      stage: course.stages?.name || '-',
+      units: course.units || 1
+    }));
+    const headers = [
+      { key: 'name', label: 'اسم المادة' },
+      { key: 'stage', label: 'المرحلة' },
+      { key: 'units', label: 'عدد الوحدات' }
+    ];
+    exportToExcel(exportData, headers, `مواد_قسم_${selectedDept.name}`);
+  };
+
   const openEditCourse = (course) => {
     setCourseForm({
       id: course.id,
@@ -277,10 +293,16 @@ export default function CollegeAdminDepartments() {
                     <h2 style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-primary)' }}>المواد الدراسية لقسم {selectedDept.name}</h2>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>إدارة المواد وتخصيصها للمراحل وتعيين عدد الوحدات.</span>
                   </div>
-                  <Button size="sm" onClick={() => { setCourseForm({ id: null, name: '', stage_id: stages[0]?.id || '', units: 1 }); setIsCourseModalOpen(true); }}>
-                    <PlusCircle size={16} />
-                    <span>إضافة مادة</span>
-                  </Button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <Button size="sm" variant="secondary" onClick={handleDownloadCourses} disabled={courses.length === 0}>
+                      <Download size={16} />
+                      <span>تحميل المواد</span>
+                    </Button>
+                    <Button size="sm" onClick={() => { setCourseForm({ id: null, name: '', stage_id: stages[0]?.id || '', units: 1 }); setIsCourseModalOpen(true); }}>
+                      <PlusCircle size={16} />
+                      <span>إضافة مادة</span>
+                    </Button>
+                  </div>
                 </div>
 
                 {courses.length === 0 ? (
