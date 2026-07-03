@@ -560,3 +560,41 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- =========================================================================
 ALTER TABLE colleges ADD COLUMN IF NOT EXISTS logo_url text;
 ALTER TABLE colleges ADD COLUMN IF NOT EXISTS university_logo_url text;
+
+-- =========================================================================
+-- Storage Policies (Run this to configure Supabase Storage RLS)
+-- =========================================================================
+
+-- 1. Ensure storage buckets exist and are public
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('certificates', 'certificates', true)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('qr-cards', 'qr-cards', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- 2. Enable Row Level Security on storage objects if not already enabled
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- 3. Policy for public selection of certificates
+CREATE POLICY "Allow public select on certificates"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'certificates');
+
+-- 4. Policy for authenticated uploads/inserts of certificates
+CREATE POLICY "Allow authenticated insert on certificates"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (bucket_id = 'certificates');
+
+-- 5. Policy for authenticated updates of certificates
+CREATE POLICY "Allow authenticated update on certificates"
+ON storage.objects FOR UPDATE TO authenticated
+USING (bucket_id = 'certificates')
+WITH CHECK (bucket_id = 'certificates');
+
+-- 6. Policy for authenticated deletions of certificates
+CREATE POLICY "Allow authenticated delete on certificates"
+ON storage.objects FOR DELETE TO authenticated
+USING (bucket_id = 'certificates');
+

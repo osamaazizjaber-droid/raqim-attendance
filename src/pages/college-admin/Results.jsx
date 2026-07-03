@@ -200,12 +200,17 @@ export default function CollegeAdminResults() {
         });
 
         const path = `${student.id}/${academicYear.replace('/', '_')}.pdf`;
-        await supabase.storage
+        const { error: uploadErr } = await supabase.storage
           .from('certificates')
           .upload(path, pdfBlob, {
             contentType: 'application/pdf',
             upsert: true
           });
+
+        if (uploadErr) {
+          console.error(`Error uploading certificate for student ${student.id}:`, uploadErr);
+          throw uploadErr;
+        }
 
         const { data: { publicUrl } } = supabase.storage.from('certificates').getPublicUrl(path);
 
