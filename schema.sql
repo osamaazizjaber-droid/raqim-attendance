@@ -42,6 +42,8 @@ CREATE TABLE colleges (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
     university text,
+    logo_url text,
+    university_logo_url text,
     subscription_expires_at date NOT NULL DEFAULT (now() + interval '1 year')::date,
     created_at timestamptz DEFAULT now()
 );
@@ -551,3 +553,10 @@ BEGIN
   RETURN new_user_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =========================================================================
+-- Migration: Add logo columns to colleges table
+-- Run this on existing databases that already have the colleges table
+-- =========================================================================
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS logo_url text;
+ALTER TABLE colleges ADD COLUMN IF NOT EXISTS university_logo_url text;

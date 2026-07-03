@@ -30,6 +30,8 @@ export default function SuperAdminColleges() {
     id: null,
     name: '',
     university: '',
+    logo_url: '',
+    university_logo_url: '',
     subscription_expires_at: ''
   });
 
@@ -99,7 +101,9 @@ export default function SuperAdminColleges() {
           .from('colleges')
           .update({ 
             name: collegeForm.name, 
-            university: collegeForm.university, 
+            university: collegeForm.university,
+            logo_url: collegeForm.logo_url || null,
+            university_logo_url: collegeForm.university_logo_url || null,
             subscription_expires_at: collegeForm.subscription_expires_at 
           })
           .eq('id', collegeForm.id);
@@ -111,14 +115,16 @@ export default function SuperAdminColleges() {
           .from('colleges')
           .insert({ 
             name: collegeForm.name, 
-            university: collegeForm.university, 
+            university: collegeForm.university,
+            logo_url: collegeForm.logo_url || null,
+            university_logo_url: collegeForm.university_logo_url || null,
             subscription_expires_at: collegeForm.subscription_expires_at || new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]
           });
         if (error) throw error;
         showToast('نجاح', 'تم إضافة الكلية بنجاح', 'success');
       }
       setIsCollegeModalOpen(false);
-      setCollegeForm({ id: null, name: '', university: '', subscription_expires_at: '' });
+      setCollegeForm({ id: null, name: '', university: '', logo_url: '', university_logo_url: '', subscription_expires_at: '' });
       fetchColleges();
     } catch (err) {
       showToast('خطأ', err.message || 'فشل حفظ الكلية', 'danger');
@@ -251,6 +257,8 @@ export default function SuperAdminColleges() {
                                     id: col.id,
                                     name: col.name,
                                     university: col.university || '',
+                                    logo_url: col.logo_url || '',
+                                    university_logo_url: col.university_logo_url || '',
                                     subscription_expires_at: col.subscription_expires_at
                                   });
                                   setIsCollegeModalOpen(true);
@@ -333,7 +341,7 @@ export default function SuperAdminColleges() {
           isOpen={isCollegeModalOpen} 
           onClose={() => {
             setIsCollegeModalOpen(false);
-            setCollegeForm({ id: null, name: '', university: '', subscription_expires_at: '' });
+            setCollegeForm({ id: null, name: '', university: '', logo_url: '', university_logo_url: '', subscription_expires_at: '' });
           }} 
           title={collegeForm.id ? "تعديل بيانات الكلية الجامعية" : "إضافة كلية جامعية جديدة"}
         >
@@ -358,6 +366,32 @@ export default function SuperAdminColleges() {
                 onChange={e => setCollegeForm({ ...collegeForm, university: e.target.value })}
                 placeholder="مثال: جامعة تكريت"
               />
+            </div>
+            <div className={compStyles.inputGroup}>
+              <label className={compStyles.label}>🎓 رابط شعار الجامعة (University Logo URL)</label>
+              <input 
+                type="url" 
+                className={compStyles.input}
+                value={collegeForm.university_logo_url}
+                onChange={e => setCollegeForm({ ...collegeForm, university_logo_url: e.target.value })}
+                placeholder="https://example.com/university-logo.png"
+              />
+              {collegeForm.university_logo_url && (
+                <img src={collegeForm.university_logo_url} alt="university logo preview" style={{ height: '60px', marginTop: '8px', borderRadius: '8px', objectFit: 'contain', border: '1px solid var(--border)' }} onError={e => e.target.style.display='none'} />
+              )}
+            </div>
+            <div className={compStyles.inputGroup}>
+              <label className={compStyles.label}>🏛 رابط شعار الكلية (College Logo URL)</label>
+              <input 
+                type="url" 
+                className={compStyles.input}
+                value={collegeForm.logo_url}
+                onChange={e => setCollegeForm({ ...collegeForm, logo_url: e.target.value })}
+                placeholder="https://example.com/college-logo.png"
+              />
+              {collegeForm.logo_url && (
+                <img src={collegeForm.logo_url} alt="college logo preview" style={{ height: '60px', marginTop: '8px', borderRadius: '8px', objectFit: 'contain', border: '1px solid var(--border)' }} onError={e => e.target.style.display='none'} />
+              )}
             </div>
             <div className={compStyles.inputGroup}>
               <label className={compStyles.label}>تاريخ انتهاء الاشتراك السنوي</label>

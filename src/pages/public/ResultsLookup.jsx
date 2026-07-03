@@ -86,6 +86,8 @@ export default function ResultsLookup() {
       const university = { name: studentData?.colleges?.university || 'جامعة رقيم' };
       const college = { name: studentData?.colleges?.name || 'الكلية' };
       const department = { name: studentData?.departments?.name || 'القسم' };
+      const universityLogoUrl = studentData?.colleges?.university_logo_url || null;
+      const collegeLogoUrl = studentData?.colleges?.logo_url || null;
 
       const pdfBlob = await generateCertificatePDF({
         student: studentData,
@@ -95,7 +97,9 @@ export default function ResultsLookup() {
         academicYear,
         university,
         college,
-        department
+        department,
+        universityLogoUrl,
+        collegeLogoUrl,
       });
 
       const url = URL.createObjectURL(pdfBlob);

@@ -151,11 +151,13 @@ export default function CollegeAdminResults() {
     try {
       const { data: collegeData } = await supabase
         .from('colleges')
-        .select('name, university')
+        .select('name, university, logo_url, university_logo_url')
         .eq('id', adminDetails.college_id)
         .single();
       const college = collegeData;
       const university = { name: collegeData?.university || 'رقيم حضور' };
+      const collegeLogoUrl = collegeData?.logo_url || null;
+      const universityLogoUrl = collegeData?.university_logo_url || null;
 
       const { data: studentDetails } = await supabase
         .from('students')
@@ -192,7 +194,9 @@ export default function CollegeAdminResults() {
           academicYear,
           university,
           college,
-          department: student.departments
+          department: student.departments,
+          universityLogoUrl,
+          collegeLogoUrl,
         });
 
         const path = `certificates/${student.id}/${academicYear.replace('/', '_')}.pdf`;
