@@ -479,71 +479,7 @@ export const generateCertificatePDF = async ({
   drawResultPill('النتيجة الكلية', statusText, statusColor, W / 2 - 220);
   drawResultPill('التقدير العام', overallGrade, overallColor, W / 2 + 220);
 
-  // ─────────────────────────────────────────
-  // 12. SIGNATURES + GOLD STAMP
-  // ─────────────────────────────────────────
-  const sigY = H - 190;
 
-  // Gold seal (official stamp) — bottom left
-  ctx.save();
-  ctx.globalAlpha = 0.85;
-  drawGeometricSeal(ctx, 220, sigY + 40, 75, '#0F172A', '#C9A84C', true);
-  ctx.restore();
-  ctx.fillStyle = '#C9A84C';
-  ctx.font = 'bold 18px Tajawal, Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('الختم الرسمي', 220, sigY + 136);
-
-  // Dean signature — bottom right
-  const sigRightX = W - 250;
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(sigRightX - 120, sigY + 80);
-  ctx.lineTo(sigRightX + 120, sigY + 80);
-  ctx.stroke();
-  ctx.fillStyle = '#1E293B';
-  ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('عميد الكلية', sigRightX, sigY + 108);
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = '18px Tajawal, Arial, sans-serif';
-  ctx.fillText('التوقيع وإشارة الختم', sigRightX, sigY + 132);
-
-  // Registrar signature — bottom centre-right
-  const sigMidX = W / 2 + 80;
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(sigMidX - 120, sigY + 80);
-  ctx.lineTo(sigMidX + 120, sigY + 80);
-  ctx.stroke();
-  ctx.fillStyle = '#1E293B';
-  ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('مسجل الكلية', sigMidX, sigY + 108);
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = '18px Tajawal, Arial, sans-serif';
-  ctx.fillText('التوقيع وإشارة الختم', sigMidX, sigY + 132);
-
-  // ─────────────────────────────────────────
-  // 13. BOTTOM FOOTER
-  // ─────────────────────────────────────────
-  ctx.strokeStyle = '#E2E8F0';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(100, H - 80);
-  ctx.lineTo(W - 100, H - 80);
-  ctx.stroke();
-
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = '18px Tajawal, Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(
-    `وثيقة رسمية صادرة عن ${college?.name || 'الكلية'} | منصة رقيم الأكاديمية | ${new Date().toLocaleDateString('ar-EG')}`,
-    W / 2,
-    H - 50
-  );
 
   // ─────────────────────────────────────────
   // 14. EXPORT AS PDF
