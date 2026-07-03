@@ -17,7 +17,7 @@ const loadImage = (url) => new Promise((resolve) => {
  * Draw a geometric seal/crest centered at (cx, cy) with given radius.
  * Used as a fallback when no logo image is provided.
  */
-const drawGeometricSeal = (ctx, cx, cy, r, primaryColor = '#0F172A', accentColor = '#C9A84C') => {
+const drawGeometricSeal = (ctx, cx, cy, r, primaryColor = '#0F172A', accentColor = '#C9A84C', drawOuterBorders = false) => {
   // Outer ring
   ctx.strokeStyle = primaryColor;
   ctx.lineWidth = r * 0.06;
@@ -63,6 +63,25 @@ const drawGeometricSeal = (ctx, cx, cy, r, primaryColor = '#0F172A', accentColor
   ctx.beginPath();
   ctx.arc(cx, cy, r * 0.12, 0, 2 * Math.PI);
   ctx.fill();
+
+  // Draw outer borders if requested (to match the logo image frame)
+  if (drawOuterBorders) {
+    const scale = r / 80;
+    
+    // Decorative gold ring
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 5 * scale;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 6 * scale, 0, 2 * Math.PI);
+    ctx.stroke();
+
+    // Decorative slate ring
+    ctx.strokeStyle = primaryColor;
+    ctx.lineWidth = 2 * scale;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 14 * scale, 0, 2 * Math.PI);
+    ctx.stroke();
+  }
 };
 
 /**
@@ -190,14 +209,14 @@ export const generateCertificatePDF = async ({
   if (universityLogoImg) {
     drawLogoImage(ctx, universityLogoImg, 200, logoCY, logoSize);
   } else {
-    drawGeometricSeal(ctx, 200, logoCY, logoSize / 2, '#0F172A', '#C9A84C');
+    drawGeometricSeal(ctx, 200, logoCY, logoSize / 2, '#0F172A', '#C9A84C', true);
   }
 
   // College logo — top RIGHT
   if (collegeLogoImg) {
     drawLogoImage(ctx, collegeLogoImg, W - 200, logoCY, logoSize);
   } else {
-    drawGeometricSeal(ctx, W - 200, logoCY, logoSize / 2, '#1E3A8A', '#C9A84C');
+    drawGeometricSeal(ctx, W - 200, logoCY, logoSize / 2, '#1E3A8A', '#C9A84C', true);
   }
 
   // ─────────────────────────────────────────
@@ -468,7 +487,7 @@ export const generateCertificatePDF = async ({
   // Gold seal (official stamp) — bottom left
   ctx.save();
   ctx.globalAlpha = 0.85;
-  drawGeometricSeal(ctx, 220, sigY + 40, 75, '#0F172A', '#C9A84C');
+  drawGeometricSeal(ctx, 220, sigY + 40, 75, '#0F172A', '#C9A84C', true);
   ctx.restore();
   ctx.fillStyle = '#C9A84C';
   ctx.font = 'bold 18px Tajawal, Arial, sans-serif';
