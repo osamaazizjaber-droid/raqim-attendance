@@ -372,10 +372,22 @@ export const handleDownloadPdfCallback = async (bot, chatId, data) => {
       return;
     }
 
-    // إرسال ملف الـ PDF مباشرة داخل المحادثة
-    await bot.sendDocument(chatId, cert.pdf_url, {
+    // تحميل ملف الـ PDF على الخادم أولاً ثم إرساله كـ Buffer لتجنب مشاكل Telegram مع روابط Supabase
+    const pdfResponse = await fetch(cert.pdf_url);
+    if (!pdfResponse.ok) {
+      throw new Error(`Failed to fetch PDF: ${pdfResponse.status} ${pdfResponse.statusText}`);
+    }
+    const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+
+    const fileName = `شهادة_${student.full_name?.replace(/\s+/g, '_') || 'الطالب'}_${cert.academic_year.replace('/', '-')}.pdf`;
+
+    // إرسال ملف الـ PDF مباشرة داخل المحادثة كـ Buffer
+    await bot.sendDocument(chatId, pdfBuffer, {
       caption: `📄 <b>الشهادة الأكاديمية الرسمية للعام الدراسي: ${cert.academic_year}</b>\n• التقدير العام: <b>${cert.overall_grade}</b>\n• الحالة: <b>${cert.is_passed ? 'ناجح 🎉' : 'راسب ❌'}</b>`,
       parse_mode: 'HTML'
+    }, {
+      filename: fileName,
+      contentType: 'application/pdf'
     });
   } catch (err) {
     console.error('Error in handleDownloadPdfCallback:', err);
