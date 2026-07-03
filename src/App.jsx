@@ -60,8 +60,20 @@ export function SubscriptionBlockedScreen({ reason }) {
             </>
           )}
         </p>
-        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '1.5rem' }}>
-          رقيم — نظام الحضور والنتائج الجامعي الذكي
+        <div style={{
+          marginTop: '2rem',
+          textAlign: 'center',
+          fontSize: '0.8rem',
+          color: 'var(--text-muted)',
+          lineHeight: '1.6',
+          borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+          paddingTop: '1rem'
+        }}>
+          جميع الحقوق محفوظة لمنصة رقيم © {new Date().getFullYear()}
+          <br />
+          للتواصل والدعم الفني: <a href="mailto:osamaazizjaber@gmail.com" style={{ color: 'var(--accent)', textDecoration: 'none' }}>osamaazizjaber@gmail.com</a>
+          <br />
+          واتساب / هاتف: <a href="https://wa.me/9647716739456" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>+9647716739456</a>
         </div>
       </div>
     </div>
