@@ -178,6 +178,20 @@ export default function CollegeAdminResults() {
       for (const student of studentDetails) {
         const studentResults = allStudentResults.filter(r => r.student_id === student.id);
         if (studentResults.length === 0) {
+          // إذا لم يتبقَ نتائج للطالب، يتم حذف شهادته من قاعدة البيانات والتخزين
+          await supabase
+            .from('certificates')
+            .delete()
+            .eq('student_id', student.id)
+            .eq('academic_year', academicYear);
+
+          try {
+            const path = `${student.id}/${academicYear.replace('/', '_')}.pdf`;
+            await supabase.storage.from('certificates').remove([path]);
+          } catch (e) {
+            console.error('Failed to remove certificate from storage:', e);
+          }
+
           current++;
           if (onProgress) onProgress(current, studentDetails.length);
           continue;
@@ -436,10 +450,15 @@ export default function CollegeAdminResults() {
   const handleDeleteResult = async (resId) => {
     if (!window.confirm('هل أنت متأكد من حذف هذه النتيجة نهائياً؟')) return;
     try {
+      const currentResult = results.find(r => r.id === resId);
       const { error } = await supabase.from('results').delete().eq('id', resId);
       if (error) throw error;
-      showToast('نجاح الحذف', 'تم مسح النتيجة بنجاح', 'success');
+      showToast('نجاح الحذف', 'تم مسح النتيجة بنجاح وجاري تحديث الشهادة.', 'success');
       fetchResults();
+
+      if (currentResult) {
+        autoGenerateCertificates([currentResult.student_id], currentResult.academic_year);
+      }
     } catch (err) {
       showToast('خطأ', 'فشل حذف النتيجة', 'danger');
     }
@@ -448,14 +467,14 @@ export default function CollegeAdminResults() {
   // Delete all filtered results
   const handleDeleteAllResults = async () => {
     if (filteredResults.length === 0) return;
-    if (!window.confirm(`🚨 تحذير: هل أنت متأكد من حذف جميع النتائج المعروضة حالياً بالفلتر (${filteredResults.length} نتيجة)؟ سيتم إزالة الدرجات والتقديرات نهائياً!`)) return;
+    if (!window.confirm(`🚨 تحذير: هل أنت متأكد من حذف جميع النتائج المعروضة حالياً بالفلتر (${filteredResults.length} نتيجة)؟ سيتم إزالة الدرجات والتقديرات والشهادات نهائياً!`)) return;
     if (!window.confirm('⚠️ تأكيد نهائي: هذه العملية لا يمكن التراجع عنها.')) return;
 
     setLoading(true);
     try {
       const resultIds = filteredResults.map(r => r.id);
       
-      // نقسم الحذف إلى دفعات إذا كان العدد كبيراً لتجنب أخطاء حدود الاستعلام
+      // 1. نقسم الحذف إلى دفعات إذا كان العدد كبيراً لتجنب أخطاء حدود الاستعلام
       const chunkSize = 100;
       for (let i = 0; i < resultIds.length; i += chunkSize) {
         const chunk = resultIds.slice(i, i + chunkSize);
@@ -466,10 +485,42 @@ export default function CollegeAdminResults() {
         if (error) throw error;
       }
 
-      showToast('نجاح', 'تم حذف النتائج المفلترة بنجاح', 'success');
+      // 2. تحديد الطلاب والسنوات الدراسية لحذف الشهادات الخاصة بهم من قاعدة البيانات والتخزين
+      const studentIds = Array.from(new Set(filteredResults.map(r => r.student_id)));
+      const academicYears = Array.from(new Set(filteredResults.map(r => r.academic_year)));
+
+      if (studentIds.length > 0 && academicYears.length > 0) {
+        // حذف سجلات الشهادات من قاعدة البيانات
+        await supabase
+          .from('certificates')
+          .delete()
+          .in('student_id', studentIds)
+          .in('academic_year', academicYears);
+
+        // حذف ملفات PDF من التخزين (Supabase Storage)
+        const storagePaths = [];
+        filteredResults.forEach(r => {
+          const path = `${r.student_id}/${r.academic_year.replace('/', '_')}.pdf`;
+          if (!storagePaths.includes(path)) {
+            storagePaths.push(path);
+          }
+        });
+
+        if (storagePaths.length > 0) {
+          try {
+            await supabase.storage
+              .from('certificates')
+              .remove(storagePaths);
+          } catch (storageErr) {
+            console.error('Failed to remove certificates from storage:', storageErr);
+          }
+        }
+      }
+
+      showToast('نجاح', 'تم حذف النتائج والشهادات المفلترة بنجاح', 'success');
       fetchResults();
     } catch (err) {
-      showToast('خطأ', err.message || 'فشل حذف النتائج', 'danger');
+      showToast('خطأ', err.message || 'فشل حذف النتائج والشهادات', 'danger');
     } finally {
       setLoading(false);
     }
