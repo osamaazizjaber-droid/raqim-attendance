@@ -45,6 +45,7 @@ export default function CollegeAdminResults() {
   const [resultsPreview, setResultsPreview] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [uploadStatusMsg, setUploadStatusMsg] = useState('جاري رفع وتدقيق السجلات في قاعدة البيانات...');
   const [isGenerating, setIsGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState({ current: 0, total: 0 });
 
@@ -145,7 +146,7 @@ export default function CollegeAdminResults() {
   };
 
   // توليد تلقائي للشهادات بعد الرفع أو التعديل
-  const autoGenerateCertificates = async (studentIds, academicYear) => {
+  const autoGenerateCertificates = async (studentIds, academicYear, onProgress) => {
     if (!studentIds || studentIds.length === 0) return;
     try {
       const { data: collegeData } = await supabase
@@ -171,9 +172,14 @@ export default function CollegeAdminResults() {
 
       if (!allStudentResults || allStudentResults.length === 0) return;
 
+      let current = 0;
       for (const student of studentDetails) {
         const studentResults = allStudentResults.filter(r => r.student_id === student.id);
-        if (studentResults.length === 0) continue;
+        if (studentResults.length === 0) {
+          current++;
+          if (onProgress) onProgress(current, studentDetails.length);
+          continue;
+        }
 
         const overallGrade = computeOverallGrade(studentResults);
         const isPassed = computeIsPassed(studentResults);
@@ -209,6 +215,9 @@ export default function CollegeAdminResults() {
             pdf_url: publicUrl,
             generated_by: user?.id
           }, { onConflict: 'student_id,academic_year' });
+
+        current++;
+        if (onProgress) onProgress(current, studentDetails.length);
       }
     } catch (err) {
       console.error('Error auto generating certificates:', err);
@@ -218,7 +227,8 @@ export default function CollegeAdminResults() {
   const executeUpload = async () => {
     if (resultsPreview.length === 0) return;
     setIsUploading(true);
-    setUploadProgress({ current: 0, total: resultsPreview.length });
+    setUploadStatusMsg('جاري رفع وتدقيق السجلات في قاعدة البيانات...');
+    setUploadProgress({ current: 0, total: 0 });
 
     try {
       // 1. جلب كافة طلاب وأقسام الكلية للتحقق السريع
@@ -318,20 +328,27 @@ export default function CollegeAdminResults() {
 
       if (upsertErr) throw upsertErr;
 
-      showToast('تم الرفع بنجاح ✅', `تم معالجة وإدخال ${resultsToInsert.length} نتيجة اختبار بنجاح وجاري توليد الشهادات تلقائياً في الخلفية.`, 'success');
+      // التوليد التلقائي للشهادات للطلاب المتأثرين بالرفع
+      const uniqueStudentIds = Array.from(new Set(resultsToInsert.map(r => r.student_id)));
+      const uploadYear = resultsToInsert[0]?.academic_year || '2024/2025';
+
+      setUploadStatusMsg('جاري توليد ورفع شهادات PDF للطلاب...');
+      setUploadProgress({ current: 0, total: uniqueStudentIds.length });
+
+      await autoGenerateCertificates(uniqueStudentIds, uploadYear, (current, total) => {
+        setUploadProgress({ current, total });
+      });
+
+      showToast('تم الرفع بنجاح ✅', `تم معالجة وإدخال ${resultsToInsert.length} نتيجة وتوليد ${uniqueStudentIds.length} شهادة PDF بنجاح.`, 'success');
       setIsUploadModalOpen(false);
       setResultsPreview([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
       fetchResults();
-
-      // التوليد التلقائي للشهادات للطلاب المتأثرين بالرفع في الخلفية دون تعطيل الواجهة
-      const uniqueStudentIds = Array.from(new Set(resultsToInsert.map(r => r.student_id)));
-      const uploadYear = resultsToInsert[0]?.academic_year || '2024/2025';
-      autoGenerateCertificates(uniqueStudentIds, uploadYear);
     } catch (err) {
       showToast('خطأ في الرفع', err.message || 'حدث خطأ أثناء معالجة النتائج', 'danger');
     } finally {
       setIsUploading(false);
+      setUploadStatusMsg('جاري رفع وتدقيق السجلات في قاعدة البيانات...');
     }
   };
 
@@ -829,8 +846,16 @@ export default function CollegeAdminResults() {
             {isUploading && (
               <div style={{ width: '100%', margin: '1rem 0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                  <span>جاري رفع وتدقيق السجلات في قاعدة البيانات...</span>
+                  <span>{uploadStatusMsg}</span>
+                  {uploadProgress.total > 0 && (
+                    <span>{uploadProgress.current} / {uploadProgress.total}</span>
+                  )}
                 </div>
+                {uploadProgress.total > 0 && (
+                  <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%`, height: '100%', backgroundColor: 'var(--accent)', transition: 'width 0.2s' }}></div>
+                  </div>
+                )}
               </div>
             )}
 
