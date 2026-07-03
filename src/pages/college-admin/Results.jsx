@@ -683,6 +683,103 @@ export default function CollegeAdminResults() {
     document.body.removeChild(link);
   };
 
+  // دالة تصدير كشف درجات المرحلة بترميز Excel وتضمين المواد المسجلة والطلاب والدرجات الحالية
+  const handleExportTemplate = async () => {
+    if (!selectedDept || !selectedStage || !selectedYear) {
+      showToast('تنبيه', 'يرجى اختيار القسم والمرحلة والسنة الدراسية من الفلاتر لتصدير الكشف الخاص بها.', 'warning');
+      return;
+    }
+
+    try {
+      showToast('جاري التحضير', 'جاري جلب البيانات وتصدير ملف Excel...', 'info');
+
+      // 1. جلب اسم القسم والمرحلة لعنونة الملف
+      const deptName = departments.find(d => d.id === selectedDept)?.name || 'قسم_غير_معروف';
+      const stageName = stages.find(s => s.id === selectedStage)?.name || 'مرحلة_غير_معروف';
+
+      // 2. جلب المواد الخاصة بالقسم والمرحلة المحددين
+      const { data: coursesData, error: coursesErr } = await supabase
+        .from('courses')
+        .select('id, name')
+        .eq('department_id', selectedDept)
+        .eq('stage_id', selectedStage);
+
+      if (coursesErr) throw coursesErr;
+
+      if (!coursesData || coursesData.length === 0) {
+        showToast('تنبيه', 'لا توجد مواد مسجلة لهذا القسم وهذه المرحلة.', 'warning');
+        return;
+      }
+
+      // 3. جلب جميع الطلاب في هذا القسم والمرحلة
+      const { data: studentsData, error: studentsErr } = await supabase
+        .from('students')
+        .select('id, full_name, student_number')
+        .eq('department_id', selectedDept)
+        .eq('stage_id', selectedStage)
+        .eq('college_id', adminDetails.college_id)
+        .order('full_name', { ascending: true });
+
+      if (studentsErr) throw studentsErr;
+
+      if (!studentsData || studentsData.length === 0) {
+        showToast('تنبيه', 'لا يوجد طلاب مسجلين في هذا القسم وهذه المرحلة.', 'warning');
+        return;
+      }
+
+      // 4. جلب الدرجات الحالية لهؤلاء الطلاب في هذه السنة الدراسية
+      const studentIds = studentsData.map(s => s.id);
+      const { data: resultsData, error: resultsErr } = await supabase
+        .from('results')
+        .select('student_id, course_id, score')
+        .in('student_id', studentIds)
+        .eq('academic_year', selectedYear);
+
+      if (resultsErr) throw resultsErr;
+
+      // 5. بناء هيكلية البيانات لملف Excel
+      const scoreMap = new Map();
+      if (resultsData) {
+        resultsData.forEach(r => {
+          scoreMap.set(`${r.student_id}_${r.course_id}`, r.score);
+        });
+      }
+
+      const rowsData = studentsData.map(student => {
+        const row = {
+          'الرقم الجامعي': student.student_number,
+          'اسم الطالب': student.full_name,
+        };
+
+        // إضافة أعمدة المواد مع درجاتها الحالية (أو فارغ)
+        coursesData.forEach(course => {
+          const score = scoreMap.get(`${student.id}_${course.id}`);
+          row[course.name] = score !== undefined ? score : '';
+        });
+
+        row['العام الدراسي'] = selectedYear;
+        return row;
+      });
+
+      // 6. توليد وتنزيل ملف Excel باستخدام مكتبة XLSX
+      const worksheet = XLSX.utils.json_to_sheet(rowsData);
+      
+      // تعيين اتجاه الصفحة من اليمين إلى اليسار (RTL) لملف Excel ليكون جميلاً للعربية
+      worksheet['!dir'] = 'rtl';
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'الدرجات');
+      
+      const fileName = `كشف_درجات_${deptName.replace(/\s+/g, '_')}_${stageName.replace(/\s+/g, '_')}_${selectedYear.replace(/\//g, '_')}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      showToast('تم التصدير بنجاح 📊', `تم تصدير كشف الدرجات لـ ${studentsData.length} طالب بنجاح.`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('خطأ في التصدير', 'فشل تصدير كشف الدرجات للطلاب.', 'danger');
+    }
+  };
+
   // Filter local search list
   const filteredResults = results.filter(r => {
     const term = searchQuery.toLowerCase();
@@ -712,6 +809,10 @@ export default function CollegeAdminResults() {
         <div className={styles.pageHeader}>
           <h1 className={styles.pageTitle}>لوحة إدارة النتائج والشهادات</h1>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <Button variant="secondary" onClick={handleExportTemplate}>
+              <Download size={18} />
+              <span>تصدير كشف درجات المرحلة (Excel)</span>
+            </Button>
             <Button onClick={() => setIsUploadModalOpen(true)}>
               <Upload size={18} />
               <span>رفع درجات الاختبار (Excel)</span>
