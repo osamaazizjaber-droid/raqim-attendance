@@ -349,8 +349,7 @@ async function handleTextMessage(chatId, text) {
   const keyboard = {
     inline_keyboard: [
       [
-        { text: '📊 عرض نتائج الامتحانات بالبوت', callback_data: 'view_results' },
-        { text: '🌐 بوابة النتائج (الويب)', url: resultsUrl }
+        { text: '📊 عرض نتائج الامتحانات بالبوت', callback_data: 'view_results' }
       ]
     ]
   };

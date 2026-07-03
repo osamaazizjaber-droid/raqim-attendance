@@ -171,8 +171,7 @@ export const handleTextMessage = async (bot, msg) => {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: '📊 عرض نتائج الامتحانات بالبوت', callback_data: 'view_results' },
-          { text: '🌐 بوابة النتائج (الويب)', url: `${frontendUrl}/results?q=${student.student_number}` }
+          { text: '📊 عرض نتائج الامتحانات بالبوت', callback_data: 'view_results' }
         ]
       ]
     };
