@@ -137,10 +137,10 @@ export const generateCertificatePDF = async ({
     loadImage(collegeLogoUrl),
   ]);
 
-  // Optimized canvas: A4 Landscape at 240 dpi (2000x1414 instead of 2970x2100)
+  // Optimized canvas: A4 Portrait at 240 dpi (1414x2000 instead of 2100x2970)
   // Same aspect ratio, 55% less pixels → ~4x faster rendering
-  const W = 2000;
-  const H = 1414;
+  const W = 1414;
+  const H = 2000;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -485,7 +485,7 @@ export const generateCertificatePDF = async ({
   // 14. EXPORT AS PDF
   // ─────────────────────────────────────────
   const imgData = canvas.toDataURL('image/jpeg', 0.92);
-  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  pdf.addImage(imgData, 'JPEG', 0, 0, 297, 210);
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
   return pdf.output('blob');
 };
