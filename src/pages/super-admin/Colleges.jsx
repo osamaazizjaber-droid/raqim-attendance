@@ -374,7 +374,7 @@ export default function SuperAdminColleges() {
                 className={compStyles.input}
                 value={collegeForm.university_logo_url}
                 onChange={e => setCollegeForm({ ...collegeForm, university_logo_url: e.target.value })}
-                placeholder="https://example.com/university-logo.png"
+                placeholder="https://example.com/university-logo.jpg or .png"
               />
               {collegeForm.university_logo_url && (
                 <img src={collegeForm.university_logo_url} alt="university logo preview" style={{ height: '60px', marginTop: '8px', borderRadius: '8px', objectFit: 'contain', border: '1px solid var(--border)' }} onError={e => e.target.style.display='none'} />
@@ -387,7 +387,7 @@ export default function SuperAdminColleges() {
                 className={compStyles.input}
                 value={collegeForm.logo_url}
                 onChange={e => setCollegeForm({ ...collegeForm, logo_url: e.target.value })}
-                placeholder="https://example.com/college-logo.png"
+                placeholder="https://example.com/college-logo.jpg or .png"
               />
               {collegeForm.logo_url && (
                 <img src={collegeForm.logo_url} alt="college logo preview" style={{ height: '60px', marginTop: '8px', borderRadius: '8px', objectFit: 'contain', border: '1px solid var(--border)' }} onError={e => e.target.style.display='none'} />
