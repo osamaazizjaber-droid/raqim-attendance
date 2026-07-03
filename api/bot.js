@@ -460,11 +460,11 @@ async function handleViewResults(chatId) {
 
     responseText += `\n💡 <i>ملاحظة: درجة النجاح الصغرى للمواد هي 50.</i>`;
 
-    // تجهيز أزرار تحميل الشهادات المتوفرة للتحميل المباشر داخل البوت
+    // تجهيز أزرار تحميل الشهادات المتوفرة للتحميل المباشر داخل البوت (فقط للسنوات التي تمتلك نتائج نشطة ولم تُحذف)
     const inlineButtons = [];
     if (certificates && certificates.length > 0) {
       certificates.forEach(cert => {
-        if (cert.pdf_url) {
+        if (cert.pdf_url && resultsByYear[cert.academic_year]) {
           inlineButtons.push([
             {
               text: `📥 تحميل شهادة عام ${cert.academic_year} (PDF)`,
@@ -497,6 +497,21 @@ async function handleDownloadPdfCallback(chatId, data) {
     }
 
     await bot.sendChatAction(chatId, 'upload_document');
+
+    // التحقق من وجود نتائج نشطة لهذا العام الدراسي أولاً (لتجنب إرسال شهادات للنتائج المحذوفة)
+    const { data: resCheck, error: resCheckErr } = await supabase
+      .from('results')
+      .select('id')
+      .eq('student_id', student.id)
+      .eq('academic_year', academicYear)
+      .limit(1);
+
+    if (resCheckErr) throw resCheckErr;
+
+    if (!resCheck || resCheck.length === 0) {
+      await bot.sendMessage(chatId, `⚠️ لا توجد نتائج معلنة لك حالياً للعام الدراسي ${academicYear}.`);
+      return;
+    }
 
     const { data: cert, error } = await supabase
       .from('certificates')
