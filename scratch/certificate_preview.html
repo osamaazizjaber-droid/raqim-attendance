@@ -51,8 +51,8 @@
 
         // Dummy Data
         const universityName = "جامعة بغداد";
-        const collegeName = "كلية الهندسة";
-        const departmentName = "قسم هندسة الحاسوب";
+        const collegeName = "كلية السلام الجامعة";
+        const departmentName = "هندسة الحاسوب";
         const studentName = "أحمد علي جاسم محمد";
         const studentNumber = "U-2025-04921";
         const studyType = "صباحي";
@@ -69,317 +69,230 @@
             { courses: { name: 'الذكاء الاصطناعي', units: 3 }, score: 88, grade_label: 'جيد جداً' }
         ];
 
-        // 1. Draw helper functions
-        const drawGeometricSeal = (ctx, cx, cy, r, primaryColor = '#0F172A', accentColor = '#C9A84C', drawOuterBorders = false) => {
-            ctx.strokeStyle = primaryColor;
-            ctx.lineWidth = r * 0.06;
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-            ctx.stroke();
 
+        // Star shape in center
+        ctx.fillStyle = accentColor;
+        const starPoints = 8;
+        const innerR = r * 0.22;
+        const outerR = r * 0.42;
+        ctx.beginPath();
+        for (let i = 0; i < starPoints * 2; i++) {
+            const angle = (i * Math.PI) / starPoints - Math.PI / 2;
+            const radius = i % 2 === 0 ? outerR : innerR;
+            if (i === 0) ctx.moveTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+            else ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Center dot
+        ctx.fillStyle = primaryColor;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.12, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Draw outer borders if requested (to match the logo image frame)
+        if (drawOuterBorders) {
+            const scale = r / 80;
+
+            // Decorative gold ring
             ctx.strokeStyle = accentColor;
-            ctx.lineWidth = r * 0.03;
+            ctx.lineWidth = 5 * scale;
             ctx.beginPath();
-            ctx.arc(cx, cy, r * 0.82, 0, 2 * Math.PI);
+            ctx.arc(cx, cy, r + 6 * scale, 0, 2 * Math.PI);
             ctx.stroke();
 
-            for (let i = 0; i < 12; i++) {
-                const angle = (i * Math.PI * 2) / 12;
-                ctx.strokeStyle = accentColor;
-                ctx.lineWidth = r * 0.025;
-                ctx.beginPath();
-                ctx.moveTo(cx + Math.cos(angle) * r * 0.82, cy + Math.sin(angle) * r * 0.82);
-                ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
-                ctx.stroke();
-            }
-
-            ctx.fillStyle = accentColor;
-            const starPoints = 8;
-            const innerR = r * 0.22;
-            const outerR = r * 0.42;
+            // Decorative slate ring
+            ctx.strokeStyle = primaryColor;
+            ctx.lineWidth = 2 * scale;
             ctx.beginPath();
-            for (let i = 0; i < starPoints * 2; i++) {
-                const angle = (i * Math.PI) / starPoints - Math.PI / 2;
-                const radius = i % 2 === 0 ? outerR : innerR;
-                if (i === 0) ctx.moveTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
-                else ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
-            }
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.fillStyle = primaryColor;
-            ctx.beginPath();
-            ctx.arc(cx, cy, r * 0.12, 0, 2 * Math.PI);
-            ctx.fill();
-
-            // Draw outer decorative borders (to match the logo image frame)
-            if (drawOuterBorders) {
-                const scale = r / 80;
-                ctx.strokeStyle = accentColor;
-                ctx.lineWidth = 5 * scale;
-                ctx.beginPath();
-                ctx.arc(cx, cy, r + 6 * scale, 0, 2 * Math.PI);
-                ctx.stroke();
-
-                ctx.strokeStyle = primaryColor;
-                ctx.lineWidth = 2 * scale;
-                ctx.beginPath();
-                ctx.arc(cx, cy, r + 14 * scale, 0, 2 * Math.PI);
-                ctx.stroke();
-            }
+            ctx.arc(cx, cy, r + 14 * scale, 0, 2 * Math.PI);
+            ctx.stroke();
+        }
         };
 
-        const roundRect = (x, y, w, h, r) => {
-            ctx.beginPath();
-            ctx.moveTo(x + r, y);
-            ctx.lineTo(x + w - r, y);
-            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-            ctx.lineTo(x + w, y + h - r);
-            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-            ctx.lineTo(x + r, y + h);
-            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-            ctx.lineTo(x, y + r);
-            ctx.quadraticCurveTo(x, y, x + r, y);
-            ctx.closePath();
-        };
-
-        const drawCorner = (x, y, dx, dy) => {
-            ctx.fillStyle = '#C9A84C';
-            ctx.fillRect(x, y, dx * 70, dy * 5);
-            ctx.fillRect(x, y, dx * 5, dy * 70);
-            ctx.fillRect(x + dx * 18, y + dy * 18, dx * 34, dy * 3);
-            ctx.fillRect(x + dx * 18, y + dy * 18, dx * 3, dy * 34);
-            ctx.beginPath();
-            ctx.arc(x + dx * 58, y + dy * 58, 5, 0, 2 * Math.PI);
-            ctx.fill();
-        };
-
-        // Render logic
         const render = () => {
             // Background
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, W, H);
 
-            // Double Border
-            ctx.strokeStyle = '#0F172A';
-            ctx.lineWidth = 10;
-            ctx.strokeRect(38, 38, W - 76, H - 76);
+            // Subtle page-edge shadow gradient
+            const topShadow = ctx.createLinearGradient(0, 0, 0, 80);
+            topShadow.addColorStop(0, 'rgba(15,23,42,0.02)');
+            topShadow.addColorStop(1, 'rgba(15,23,42,0)');
+            ctx.fillStyle = topShadow;
+            ctx.fillRect(0, 0, W, 80);
 
-            ctx.strokeStyle = '#C9A84C';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(56, 56, W - 112, H - 112);
+            // Double border
+            ctx.strokeStyle = '#1E293B';
+            ctx.lineWidth = 6;
+            ctx.strokeRect(40, 40, W - 80, H - 80);
 
-            // Corners
-            drawCorner(66, 66, 1, 1);
-            drawCorner(W - 66, 66, -1, 1);
-            drawCorner(66, H - 66, 1, -1);
-            drawCorner(W - 66, H - 66, -1, -1);
+            ctx.strokeStyle = '#1E293B';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(52, 52, W - 104, H - 104);
 
-            // Faint Watermark
+            // Sizing calculations
+            const logoSize = 150;
+            const headerHeight = 220;
+            const titleHeight = 120;
+            const studentRowHeight = 70;
+
+            const rowH = 65;
+            const tableHeaderH = 65;
+            const tableHeight = tableHeaderH + results.length * rowH;
+
+            const totalContentHeight = headerHeight + 40 + titleHeight + 30 + studentRowHeight + 40 + tableHeight + 80;
+            const startY = Math.max(80, (H - totalContentHeight) / 2);
+
+            // Watermark (Center)
             ctx.save();
             ctx.globalAlpha = 0.03;
             drawGeometricSeal(ctx, W / 2, H / 2 + 80, 260, '#0F172A', '#C9A84C');
             ctx.restore();
 
-            // Logos (Geometric Seals as fallback placeholder design with outer borders)
-            const logoSize = 160;
-            const logoCY = 180;
-            drawGeometricSeal(ctx, 200, logoCY, logoSize / 2, '#0F172A', '#C9A84C', true);
-            drawGeometricSeal(ctx, W - 200, logoCY, logoSize / 2, '#1E3A8A', '#C9A84C', true);
+            // Center Logo
+            const logoCY = startY + logoSize / 2;
+            drawGeometricSeal(ctx, W / 2, logoCY, logoSize / 2, '#0F172A', '#C9A84C', true);
 
-            // Header Text
-            ctx.fillStyle = '#1E293B';
-            ctx.textAlign = 'center';
-            ctx.font = 'bold 26px Tajawal, Arial, sans-serif';
-            ctx.fillText(universityName, 200, logoCY + logoSize / 2 + 36);
-            ctx.fillText(collegeName, W - 200, logoCY + logoSize / 2 + 36);
-
-            ctx.font = '28px Tajawal, Arial, sans-serif';
-            ctx.fillStyle = '#475569';
-            ctx.fillText('وزارة التعليم العالي والبحث العلمي', W / 2, 100);
-
+            // Right Aligned Text
             ctx.fillStyle = '#0F172A';
-            ctx.font = 'bold 34px Tajawal, Arial, sans-serif';
-            ctx.fillText('بسم الله الرحمن الرحيم', W / 2, 155);
-
-            ctx.font = '24px Tajawal, Arial, sans-serif';
-            ctx.fillStyle = '#475569';
-            ctx.fillText(`قسم ${departmentName} | الدراسة: ${studyType} | المرحلة: ${stageName}`, W / 2, logoCY + logoSize / 2 + 36);
-
-            // Divider Line
-            const dividerY = logoCY + logoSize / 2 + 66;
-            ctx.strokeStyle = '#C9A84C';
-            ctx.lineWidth = 2.5;
-            ctx.beginPath();
-            ctx.moveTo(100, dividerY);
-            ctx.lineTo(W / 2 - 60, dividerY);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(W / 2 + 60, dividerY);
-            ctx.lineTo(W - 100, dividerY);
-            ctx.stroke();
-
-            ctx.fillStyle = '#C9A84C';
-            ctx.beginPath();
-            ctx.moveTo(W / 2, dividerY - 14);
-            ctx.lineTo(W / 2 + 14, dividerY);
-            ctx.lineTo(W / 2, dividerY + 14);
-            ctx.lineTo(W / 2 - 14, dividerY);
-            ctx.closePath();
-            ctx.fill();
-
-            // Title Banner
-            const titleY = dividerY + 55;
-            const titleText = `وثيقة نتائج امتحانات الطلبة للعام الدراسي ${academicYear}`;
-            ctx.font = 'bold 40px Tajawal, Arial, sans-serif';
-            const titleW = ctx.measureText(titleText).width;
-
-            const bannerPadX = 80;
-            const bW = titleW + bannerPadX * 2;
-            const bH = 80;
-            const bX = W / 2 - bW / 2;
-            const bY = titleY - 10;
-            const bR = 16;
-
-            ctx.fillStyle = 'rgba(201,168,76,0.06)';
-            roundRect(bX, bY, bW, bH, bR);
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(201,168,76,0.4)';
-            ctx.lineWidth = 2;
-            roundRect(bX, bY, bW, bH, bR);
-            ctx.stroke();
-
-            ctx.fillStyle = '#0F172A';
-            ctx.fillText(titleText, W / 2, titleY + bH / 2 + 2);
-
-            // Student details
-            const studentY = bY + bH + 46;
-            ctx.font = 'bold 30px Tajawal, Arial, sans-serif';
-            ctx.fillStyle = '#1E293B';
             ctx.textAlign = 'right';
-            ctx.fillText(`اسم الطالب: ${studentName}`, W - 110, studentY);
+            ctx.font = 'bold 24px Tajawal, Arial, sans-serif';
+            ctx.fillText('وزارة التعليم العالي والبحث العلمي', W - 100, startY + 50);
+            ctx.fillText(collegeName, W - 100, startY + 95);
+            ctx.fillText(`قسم ${departmentName}`, W - 100, startY + 140);
+
+            // Left Aligned Text
             ctx.textAlign = 'left';
-            ctx.fillText(`الرقم الجامعي: ${studentNumber}`, 110, studentY);
+            ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
+            const studyTypeText = studyType === 'مسائي' ? 'المسائية' : 'الصباحية';
+            ctx.fillText(`المرحلة: ${stageName}`, 100, startY + 50);
+            ctx.fillText(`الدراسة: ${studyTypeText}`, 100, startY + 95);
 
-            // Draw Table
-            const drawTable = (items, startY) => {
-                const tableLeft = 80;
-                const tableRight = W - 80;
-                const tableWidth = tableRight - tableLeft;
-                const colW = tableWidth / items.length;
-                const headerH = 84;
-                const cellH = 84;
 
-                const gradeColors = {
-                    'امتياز': '#D97706',
-                    'جيد جداً': '#059669',
-                    'جيد': '#2563EB',
-                    'متوسط': '#D97706',
-                    'مقبول': '#6B7280',
-                    'ضعيف': '#DC2626',
-                };
+            ctx.font = 'bold 30px Tajawal, Arial, sans-serif';
+            ctx.fillText(academicYear, W / 2, titleY + 45);
 
-                items.forEach((item, i) => {
-                    const x = tableLeft + i * colW;
+            ctx.font = '22px Tajawal, Arial, sans-serif';
+            ctx.fillStyle = '#334155';
+            ctx.fillText('ملاحظة: لا تعتبر هذه النتيجة وثيقة رسمية.', W / 2, titleY + 90);
 
-                    // Header
-                    ctx.fillStyle = '#0F172A';
-                    ctx.fillRect(x, startY, colW, headerH);
-                    ctx.fillStyle = '#C9A84C';
-                    ctx.fillRect(x, startY, colW, 4);
-                    ctx.strokeStyle = '#1E293B';
-                    ctx.lineWidth = 1.5;
-                    ctx.strokeRect(x, startY, colW, headerH);
+            // Student Info Row
+            const studentY = titleY + 120;
+            const boxW = W - 200;
+            const boxX = 100;
+            const labelW = 280;
+            const nameW = boxW - labelW;
 
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.textAlign = 'center';
-                    ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
-                    ctx.fillText(item.courses.name, x + colW / 2, startY + 38);
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(boxX, studentY, boxW, studentRowHeight);
 
-                    ctx.fillStyle = '#94A3B8';
-                    ctx.font = '18px Tajawal, Arial, sans-serif';
-                    ctx.fillText(`(${item.courses.units} وحدة)`, x + colW / 2, startY + 68);
+            // Right cell: "اسم الطالب"
+            ctx.fillStyle = '#E5E7EB';
+            ctx.fillRect(boxX + nameW, studentY, labelW, studentRowHeight);
+            ctx.strokeRect(boxX + nameW, studentY, labelW, studentRowHeight);
 
-                    // Cell
-                    const cellBg = i % 2 === 0 ? '#F8FAFC' : '#F1F5F9';
-                    ctx.fillStyle = cellBg;
-                    ctx.fillRect(x, startY + headerH, colW, cellH);
-                    ctx.strokeStyle = '#E2E8F0';
-                    ctx.lineWidth = 1.5;
-                    ctx.strokeRect(x, startY + headerH, colW, cellH);
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 24px Tajawal, Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('اسم الطالب', boxX + nameW + labelW / 2, studentY + studentRowHeight / 2 + 8);
 
-                    ctx.fillStyle = '#334155';
-                    ctx.font = 'bold 20px Tajawal, Arial, sans-serif';
-                    ctx.fillText(item.score, x + colW / 2, startY + headerH + 28);
+            // Left cell: Value
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(boxX, studentY, nameW, studentRowHeight);
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 24px Tajawal, Arial, sans-serif';
+            ctx.fillText(studentName, boxX + nameW / 2, studentY + studentRowHeight / 2 + 8);
 
-                    // Badge
-                    const grade = item.grade_label;
-                    const gc = gradeColors[grade] || '#6B7280';
-                    const badgeW = Math.min(colW - 24, 150);
-                    const badgeH = 38;
-                    const badgeX = x + (colW - badgeW) / 2;
-                    const badgeY = startY + headerH + cellH - badgeH - 10;
-                    const br = badgeH / 2;
+            // Side-by-side Tables
+            const tablesStartY = studentY + studentRowHeight + 40;
+            const tableLeftX = 100;
+            const statusBoxW = 240;
+            const gap = 40;
 
-                    ctx.fillStyle = gc + '22';
-                    roundRect(badgeX, badgeY, badgeW, badgeH, br);
-                    ctx.fill();
-                    ctx.strokeStyle = gc;
-                    ctx.lineWidth = 1.5;
-                    roundRect(badgeX, badgeY, badgeW, badgeH, br);
-                    ctx.stroke();
+            const mainTableX = tableLeftX + statusBoxW + gap;
+            const mainTableW = W - 100 - mainTableX;
 
-                    ctx.fillStyle = gc;
-                    ctx.font = 'bold 18px Tajawal, Arial, sans-serif';
-                    ctx.fillText(grade, x + colW / 2, badgeY + badgeH / 2 + 6);
-                });
-            };
+            // A. Left table (Overall status)
+            const statusRowH = 65;
+            const drawStatusCell = (x, y, w, h, bg, text, isHeader, textColor = '#000000') => {
+                ctx.fillStyle = bg;
+                ctx.fillRect(x, y, w, h);
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2.5;
+                ctx.strokeRect(x, y, w, h);
 
-            const tableStartY = studentY + 34;
-            drawTable(results, tableStartY);
-
-            // Overall Result
-            const resultY = tableStartY + 168 + 60;
-            const statusColor = isPassed ? '#059669' : '#DC2626';
-            const statusText = isPassed ? '✓ ناجح' : '✗ راسب';
-
-            const overallColors = {
-                'امتياز': '#D97706',
-                'جيد جداً': '#059669',
-                'جيد': '#2563EB',
-                'متوسط': '#D97706',
-                'مقبول': '#6B7280',
-                'ضعيف': '#DC2626',
-            };
-            const overallColor = overallColors[overallGrade] || '#475569';
-
-            const drawResultPill = (label, value, color, cx) => {
-                const pillW = 340;
-                const pillH = 68;
-                const pillX = cx - pillW / 2;
-                const pillY = resultY;
-
-                ctx.fillStyle = color + '15';
-                roundRect(pillX, pillY, pillW, pillH, pillH / 2);
-                ctx.fill();
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 2;
-                roundRect(pillX, pillY, pillW, pillH, pillH / 2);
-                ctx.stroke();
-
-                ctx.fillStyle = '#475569';
-                ctx.font = '22px Tajawal, Arial, sans-serif';
+                ctx.fillStyle = textColor;
+                ctx.font = isHeader ? 'bold 22px Tajawal, Arial, sans-serif' : 'bold 24px Tajawal, Arial, sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText(label, cx, pillY + 26);
-
-                ctx.fillStyle = color;
-                ctx.font = 'bold 28px Tajawal, Arial, sans-serif';
-                ctx.fillText(value, cx, pillY + 58);
+                ctx.fillText(text, x + w / 2, y + h / 2 + 8);
             };
 
-            drawResultPill('النتيجة الكلية', statusText, statusColor, W / 2 - 220);
-            drawResultPill('التقدير العام', overallGrade, overallColor, W / 2 + 220);
+            const statusColor = isPassed ? '#047857' : '#B91C1C';
+            const statusText = isPassed ? 'ناجح' : 'راسب';
 
+            drawStatusCell(tableLeftX, tablesStartY, statusBoxW, statusRowH, '#E5E7EB', 'النتيجة', true);
+            drawStatusCell(tableLeftX, tablesStartY + statusRowH, statusBoxW, statusRowH, '#FFFFFF', statusText, false, statusColor);
+            drawStatusCell(tableLeftX, tablesStartY + statusRowH * 2, statusBoxW, statusRowH, '#E5E7EB', 'التقدير', true);
+            drawStatusCell(tableLeftX, tablesStartY + statusRowH * 3, statusBoxW, statusRowH, '#FFFFFF', overallGrade || 'غير متوفر', false, statusColor);
+
+            // B. Right table (Subjects)
+            const subColW = mainTableW * 0.70;
+            const gradeColW = mainTableW - subColW;
+
+            // Draw header
+            ctx.fillStyle = '#E5E7EB';
+            ctx.fillRect(mainTableX, tablesStartY, subColW, tableHeaderH);
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(mainTableX, tablesStartY, subColW, tableHeaderH);
+
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('المادة', mainTableX + subColW / 2, tablesStartY + tableHeaderH / 2 + 8);
+
+            ctx.fillStyle = '#E5E7EB';
+            ctx.fillRect(mainTableX + subColW, tablesStartY, gradeColW, tableHeaderH);
+            ctx.strokeRect(mainTableX + subColW, tablesStartY, gradeColW, tableHeaderH);
+
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
+            ctx.fillText('التقدير', mainTableX + subColW + gradeColW / 2, tablesStartY + tableHeaderH / 2 + 8);
+
+            // Draw rows
+            results.forEach((item, index) => {
+                const rowY = tablesStartY + tableHeaderH + index * rowH;
+
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(mainTableX, rowY, subColW, rowH);
+                ctx.strokeRect(mainTableX, rowY, subColW, rowH);
+
+                ctx.fillStyle = '#000000';
+                ctx.font = 'bold 20px Tajawal, Arial, sans-serif';
+                ctx.textAlign = 'center';
+                const units = item.courses?.units || 1;
+                ctx.fillText(`${item.courses?.name || 'مادة'} (${units})`, mainTableX + subColW / 2, rowY + rowH / 2 + 8);
+
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(mainTableX + subColW, rowY, gradeColW, rowH);
+                ctx.strokeRect(mainTableX + subColW, rowY, gradeColW, rowH);
+
+                const grade = item.grade_label || '';
+                const gradeColors = {
+                    'امتياز': '#B45309',
+                    'جيد جداً': '#047857',
+                    'جيد': '#1D4ED8',
+                    'متوسط': '#D97706',
+                    'مقبول': '#4B5563',
+                    'ضعيف': '#B91C1C',
+                };
+                ctx.fillStyle = gradeColors[grade] || '#000000';
+                ctx.font = 'bold 20px Tajawal, Arial, sans-serif';
+                ctx.fillText(grade, mainTableX + subColW + gradeColW / 2, rowY + rowH / 2 + 8);
+            });
         };
 
         // Wait for fonts to load

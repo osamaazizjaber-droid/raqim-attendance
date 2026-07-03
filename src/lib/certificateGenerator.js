@@ -14,74 +14,70 @@ const loadImage = (url) => new Promise((resolve) => {
 });
 
 /**
- * Draw a geometric seal/crest centered at (cx, cy) with given radius.
- * Used as a fallback when no logo image is provided.
+ * Helper: shield-style emblem — no circle anywhere
+ * Used as a fallback when no logo image is provided or for the background watermark.
  */
-const drawGeometricSeal = (ctx, cx, cy, r, primaryColor = '#0F172A', accentColor = '#C9A84C', drawOuterBorders = false) => {
-  // Outer ring
+const drawUniversityLogo = (ctx, cx, cy, r, primaryColor = '#0F172A', accentColor = '#C9A84C') => {
+  const w = r * 1.7;
+  const h = r * 2.1;
+  const x = cx - w / 2;
+  const top = cy - h / 2;
+
+  ctx.save();
+
+  // Outer shield outline
+  ctx.beginPath();
+  ctx.moveTo(x, top);
+  ctx.lineTo(x + w, top);
+  ctx.lineTo(x + w, top + h * 0.58);
+  ctx.bezierCurveTo(x + w, top + h * 0.82, cx + w * 0.15, top + h * 0.94, cx, top + h);
+  ctx.bezierCurveTo(cx - w * 0.15, top + h * 0.94, x, top + h * 0.82, x, top + h * 0.58);
+  ctx.closePath();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+  ctx.lineWidth = r * 0.09;
   ctx.strokeStyle = primaryColor;
-  ctx.lineWidth = r * 0.06;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
   ctx.stroke();
 
-  // Inner ring
+  // Inner inset shield line
+  const inset = r * 0.16;
+  ctx.beginPath();
+  ctx.moveTo(x + inset, top + inset);
+  ctx.lineTo(x + w - inset, top + inset);
+  ctx.lineTo(x + w - inset, top + h * 0.58);
+  ctx.bezierCurveTo(x + w - inset, top + h * 0.78, cx + (w - 2 * inset) * 0.12, top + h * 0.90, cx, top + h - inset * 1.4);
+  ctx.bezierCurveTo(cx - (w - 2 * inset) * 0.12, top + h * 0.90, x + inset, top + h * 0.78, x + inset, top + h * 0.58);
+  ctx.closePath();
+  ctx.lineWidth = r * 0.035;
   ctx.strokeStyle = accentColor;
-  ctx.lineWidth = r * 0.03;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r * 0.82, 0, 2 * Math.PI);
   ctx.stroke();
 
-  // Rays between rings
-  for (let i = 0; i < 12; i++) {
-    const angle = (i * Math.PI * 2) / 12;
-    ctx.strokeStyle = accentColor;
-    ctx.lineWidth = r * 0.025;
-    ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(angle) * r * 0.82, cy + Math.sin(angle) * r * 0.82);
-    ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
-    ctx.stroke();
-  }
-
-  // Star shape in center
+  // Central star mark
   ctx.fillStyle = accentColor;
-  const starPoints = 8;
-  const innerR = r * 0.22;
-  const outerR = r * 0.42;
+  const starPoints = 6;
+  const innerR = r * 0.16;
+  const outerR = r * 0.34;
+  const starCY = cy - r * 0.08;
   ctx.beginPath();
   for (let i = 0; i < starPoints * 2; i++) {
     const angle = (i * Math.PI) / starPoints - Math.PI / 2;
     const radius = i % 2 === 0 ? outerR : innerR;
-    if (i === 0) ctx.moveTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
-    else ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+    const px = cx + Math.cos(angle) * radius;
+    const py = starCY + Math.sin(angle) * radius;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
   }
   ctx.closePath();
   ctx.fill();
 
-  // Center dot
-  ctx.fillStyle = primaryColor;
+  // Base line under the star, inside the shield
+  ctx.strokeStyle = primaryColor;
+  ctx.lineWidth = r * 0.03;
   ctx.beginPath();
-  ctx.arc(cx, cy, r * 0.12, 0, 2 * Math.PI);
-  ctx.fill();
+  ctx.moveTo(cx - r * 0.4, top + h * 0.68);
+  ctx.lineTo(cx + r * 0.4, top + h * 0.68);
+  ctx.stroke();
 
-  // Draw outer borders if requested (to match the logo image frame)
-  if (drawOuterBorders) {
-    const scale = r / 80;
-    
-    // Decorative gold ring
-    ctx.strokeStyle = accentColor;
-    ctx.lineWidth = 5 * scale;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r + 6 * scale, 0, 2 * Math.PI);
-    ctx.stroke();
-
-    // Decorative slate ring
-    ctx.strokeStyle = primaryColor;
-    ctx.lineWidth = 2 * scale;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r + 14 * scale, 0, 2 * Math.PI);
-    ctx.stroke();
-  }
+  ctx.restore();
 };
 
 /**
@@ -130,6 +126,7 @@ export const generateCertificatePDF = async ({
   department,
   universityLogoUrl = null,
   collegeLogoUrl = null,
+  roundName = 'الاول',
 }) => {
   // Pre-load logo image (university logo preferred, college logo as fallback)
   const logoUrl = universityLogoUrl || collegeLogoUrl;
@@ -171,7 +168,7 @@ export const generateCertificatePDF = async ({
   // ─────────────────────────────────────────
   const logoSize = 150;
   const headerHeight = 220; // Includes logo and text
-  const titleHeight = 120;
+  const titleHeight = 105;
   const studentRowHeight = 70;
   
   const rowH = 65; // Height of table rows
@@ -181,28 +178,12 @@ export const generateCertificatePDF = async ({
   const totalContentHeight = headerHeight + 40 + titleHeight + 30 + studentRowHeight + 40 + tableHeight + 80;
   const startY = Math.max(80, (H - totalContentHeight) / 2);
 
-  // Helper for drawing rounded rect
-  const roundRect = (x, y, w, h, r) => {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  };
-
   // ─────────────────────────────────────────
   // 4. FAINT WATERMARK (centre)
   // ─────────────────────────────────────────
   ctx.save();
-  ctx.globalAlpha = 0.03;
-  drawGeometricSeal(ctx, W / 2, H / 2 + 80, 260, '#0F172A', '#C9A84C');
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = 0.035;
+  drawUniversityLogo(ctx, W / 2, H / 2 + 40, 240, '#0F172A', '#C9A84C');
   ctx.restore();
 
   // ─────────────────────────────────────────
@@ -213,7 +194,7 @@ export const generateCertificatePDF = async ({
   if (logoImg) {
     drawLogoImage(ctx, logoImg, W / 2, logoCY, logoSize);
   } else {
-    drawGeometricSeal(ctx, W / 2, logoCY, logoSize / 2, '#0F172A', '#C9A84C', true);
+    drawUniversityLogo(ctx, W / 2, logoCY, logoSize / 2, '#0F172A', '#C9A84C');
   }
 
   // B. Right Aligned Text
@@ -221,7 +202,7 @@ export const generateCertificatePDF = async ({
   ctx.textAlign = 'right';
   ctx.font = 'bold 24px Tajawal, Arial, sans-serif';
   ctx.fillText('وزارة التعليم العالي والبحث العلمي', W - 100, startY + 50);
-  ctx.fillText(university?.name || college?.university || 'كلية السلام الجامعة', W - 100, startY + 95);
+  ctx.fillText(college?.name || university?.name || college?.university || 'كلية السلام الجامعة', W - 100, startY + 95);
   ctx.fillText(`قسم ${department?.name || '-'}`, W - 100, startY + 140);
 
   // C. Left Aligned Text
@@ -231,6 +212,7 @@ export const generateCertificatePDF = async ({
   const studyTypeText = student.study_type === 'مسائي' ? 'المسائية' : 'الصباحية';
   ctx.fillText(`المرحلة: ${stageName}`, 100, startY + 50);
   ctx.fillText(`الدراسة: ${studyTypeText}`, 100, startY + 95);
+  ctx.fillText(`الدور: ${roundName}`, 100, startY + 140);
 
   // ─────────────────────────────────────────
   // 6. TITLE
@@ -239,14 +221,11 @@ export const generateCertificatePDF = async ({
   ctx.textAlign = 'center';
   ctx.fillStyle = '#000000';
   ctx.font = 'bold 36px Tajawal, Arial, sans-serif';
-  ctx.fillText('النتيجة النهائية', W / 2, titleY);
-  
-  ctx.font = 'bold 30px Tajawal, Arial, sans-serif';
-  ctx.fillText(academicYear, W / 2, titleY + 45);
+  ctx.fillText(academicYear, W / 2, titleY);
 
   ctx.font = '22px Tajawal, Arial, sans-serif';
   ctx.fillStyle = '#334155';
-  ctx.fillText('ملاحظة: لا تعتبر هذه النتيجة وثيقة رسمية.', W / 2, titleY + 90);
+  ctx.fillText('ملاحظة: لا تعتبر هذه النتيجة وثيقة رسمية.', W / 2, titleY + 45);
 
   // ─────────────────────────────────────────
   // 7. STUDENT INFO ROW
@@ -314,67 +293,61 @@ export const generateCertificatePDF = async ({
   drawStatusCell(tableLeftX, tablesStartY, statusBoxW, statusRowH, '#E5E7EB', 'النتيجة', true);
   drawStatusCell(tableLeftX, tablesStartY + statusRowH, statusBoxW, statusRowH, '#FFFFFF', statusText, false, statusColor);
   drawStatusCell(tableLeftX, tablesStartY + statusRowH * 2, statusBoxW, statusRowH, '#E5E7EB', 'التقدير', true);
-  drawStatusCell(tableLeftX, tablesStartY + statusRowH * 3, statusBoxW, statusRowH, '#FFFFFF', overallGrade || 'غير متوفر', false, statusColor);
+  drawStatusCell(tableLeftX, tablesStartY + statusRowH * 3, statusBoxW, statusRowH, '#FFFFFF', overallGrade || 'غير متوفر', false, '#000000');
 
-  // B. DRAW MAIN SUBJECTS TABLE (Right side)
-  // Header row
-  const subColW = mainTableW * 0.70; // 70% for subject name
-  const gradeColW = mainTableW - subColW; // 30% for grade label
+  // B. DRAW MAIN SUBJECTS TABLE (Right side - RTL orientation)
+  const subColW = mainTableW * 0.70;
+  const gradeColW = mainTableW - subColW;
+  const gradeColX = mainTableX;
+  const subColX = mainTableX + gradeColW;
 
-  // Draw table header
+  // Header row — التقدير (left portion)
   ctx.fillStyle = '#E5E7EB';
-  ctx.fillRect(mainTableX, tablesStartY, subColW, tableHeaderH);
+  ctx.fillRect(gradeColX, tablesStartY, gradeColW, tableHeaderH);
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 2.5;
-  ctx.strokeRect(mainTableX, tablesStartY, subColW, tableHeaderH);
+  ctx.strokeRect(gradeColX, tablesStartY, gradeColW, tableHeaderH);
 
   ctx.fillStyle = '#000000';
   ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('المادة', mainTableX + subColW / 2, tablesStartY + tableHeaderH / 2 + 8);
+  ctx.fillText('التقدير', gradeColX + gradeColW / 2, tablesStartY + tableHeaderH / 2 + 8);
 
+  // Header row — المادة (right portion)
   ctx.fillStyle = '#E5E7EB';
-  ctx.fillRect(mainTableX + subColW, tablesStartY, gradeColW, tableHeaderH);
-  ctx.strokeRect(mainTableX + subColW, tablesStartY, gradeColW, tableHeaderH);
+  ctx.fillRect(subColX, tablesStartY, subColW, tableHeaderH);
+  ctx.strokeRect(subColX, tablesStartY, subColW, tableHeaderH);
 
   ctx.fillStyle = '#000000';
   ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
-  ctx.fillText('التقدير', mainTableX + subColW + gradeColW / 2, tablesStartY + tableHeaderH / 2 + 8);
+  ctx.fillText('المادة', subColX + subColW / 2, tablesStartY + tableHeaderH / 2 + 8);
 
   // Draw subject rows
   results.forEach((item, index) => {
     const rowY = tablesStartY + tableHeaderH + index * rowH;
     
-    // Draw subject name & units cell
+    // التقدير cell (left portion)
+    const grade = item.grade_label || '';
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(mainTableX, rowY, subColW, rowH);
-    ctx.strokeRect(mainTableX, rowY, subColW, rowH);
-    
+    ctx.fillRect(gradeColX, rowY, gradeColW, rowH);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(gradeColX, rowY, gradeColW, rowH);
+
     ctx.fillStyle = '#000000';
     ctx.font = 'bold 20px Tajawal, Arial, sans-serif';
     ctx.textAlign = 'center';
-    
-    const units = item.courses?.units || 1;
-    const courseText = `${item.courses?.name || 'مادة'} (${units})`;
-    ctx.fillText(courseText, mainTableX + subColW / 2, rowY + rowH / 2 + 8);
+    ctx.fillText(grade, gradeColX + gradeColW / 2, rowY + rowH / 2 + 8);
 
-    // Draw grade cell
+    // المادة cell (right portion)
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(mainTableX + subColW, rowY, gradeColW, rowH);
-    ctx.strokeRect(mainTableX + subColW, rowY, gradeColW, rowH);
-    
-    const grade = item.grade_label || '';
-    const gradeColors = {
-      'امتياز': '#B45309',
-      'جيد جداً': '#047857',
-      'جيد': '#1D4ED8',
-      'متوسط': '#D97706',
-      'مقبول': '#4B5563',
-      'ضعيف': '#B91C1C',
-    };
-    ctx.fillStyle = gradeColors[grade] || '#000000';
+    ctx.fillRect(subColX, rowY, subColW, rowH);
+    ctx.strokeRect(subColX, rowY, subColW, rowH);
+
+    ctx.fillStyle = '#000000';
     ctx.font = 'bold 20px Tajawal, Arial, sans-serif';
-    ctx.fillText(grade, mainTableX + subColW + gradeColW / 2, rowY + rowH / 2 + 8);
+    const units = item.courses?.units || 1;
+    ctx.fillText(`${item.courses?.name || 'مادة'} (${units})`, subColX + subColW / 2, rowY + rowH / 2 + 8);
   });
 
   // ─────────────────────────────────────────
