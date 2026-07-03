@@ -5,6 +5,7 @@ import { useToast } from '../../components/ui/Toast';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { ReportTable } from '../../components/reports/ReportTable';
 import { ExportButtons } from '../../components/reports/ExportButtons';
 import { CollegeAdminSidebar } from './Dashboard';
