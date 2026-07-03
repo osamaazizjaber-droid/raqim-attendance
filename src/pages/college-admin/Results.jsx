@@ -161,7 +161,7 @@ export default function CollegeAdminResults() {
 
       const { data: studentDetails } = await supabase
         .from('students')
-        .select('id, full_name, student_number, department_id, stage_id, departments(name)')
+        .select('id, full_name, student_number, department_id, stage_id, study_type, departments(name)')
         .in('id', studentIds);
 
       if (!studentDetails || studentDetails.length === 0) return;

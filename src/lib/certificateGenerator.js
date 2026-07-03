@@ -148,43 +148,38 @@ export const generateCertificatePDF = async ({
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, W, H);
 
-  // Subtle page-edge shadow gradient (top and left)
+  // Subtle page-edge shadow gradient
   const topShadow = ctx.createLinearGradient(0, 0, 0, 80);
-  topShadow.addColorStop(0, 'rgba(15,23,42,0.04)');
+  topShadow.addColorStop(0, 'rgba(15,23,42,0.02)');
   topShadow.addColorStop(1, 'rgba(15,23,42,0)');
   ctx.fillStyle = topShadow;
   ctx.fillRect(0, 0, W, 80);
 
   // ─────────────────────────────────────────
-  // 2. OUTER DOUBLE BORDER
+  // 2. OUTER DOUBLE BORDER (Formal dark blue / black)
   // ─────────────────────────────────────────
-  // Main slate border
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 10;
-  ctx.strokeRect(38, 38, W - 76, H - 76);
+  ctx.strokeStyle = '#1E293B';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(40, 40, W - 80, H - 80);
 
-  // Gold inner border
-  ctx.strokeStyle = '#C9A84C';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(56, 56, W - 112, H - 112);
+  ctx.strokeStyle = '#1E293B';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(52, 52, W - 104, H - 104);
 
   // ─────────────────────────────────────────
-  // 3. CORNER ORNAMENTS
+  // 3. DYNAMIC VERTICAL CENTERING CALCULATIONS
   // ─────────────────────────────────────────
-  const drawCorner = (x, y, dx, dy) => {
-    ctx.fillStyle = '#C9A84C';
-    ctx.fillRect(x, y, dx * 70, dy * 5);
-    ctx.fillRect(x, y, dx * 5, dy * 70);
-    ctx.fillRect(x + dx * 18, y + dy * 18, dx * 34, dy * 3);
-    ctx.fillRect(x + dx * 18, y + dy * 18, dx * 3, dy * 34);
-    ctx.beginPath();
-    ctx.arc(x + dx * 58, y + dy * 58, 5, 0, 2 * Math.PI);
-    ctx.fill();
-  };
-  drawCorner(66, 66, 1, 1);
-  drawCorner(W - 66, 66, -1, 1);
-  drawCorner(66, H - 66, 1, -1);
-  drawCorner(W - 66, H - 66, -1, -1);
+  const logoSize = 150;
+  const headerHeight = 220; // Includes logo and text
+  const titleHeight = 120;
+  const studentRowHeight = 70;
+  
+  const rowH = 65; // Height of table rows
+  const tableHeaderH = 65;
+  const tableHeight = tableHeaderH + results.length * rowH;
+  
+  const totalContentHeight = headerHeight + 40 + titleHeight + 30 + studentRowHeight + 40 + tableHeight + 80;
+  const startY = Math.max(80, (H - totalContentHeight) / 2);
 
   // Helper for drawing rounded rect
   const roundRect = (x, y, w, h, r) => {
@@ -211,35 +206,9 @@ export const generateCertificatePDF = async ({
   ctx.restore();
 
   // ─────────────────────────────────────────
-  // 5. DYNAMIC VERTICAL CENTERING CALCULATIONS
+  // 5. HEADER LOGO & TEXT (Left, Center, Right)
   // ─────────────────────────────────────────
-  const subjectsCount = results.length;
-  const subjectsPerRow = 5;
-  const chunkedResults = [];
-  for (let i = 0; i < subjectsCount; i += subjectsPerRow) {
-    chunkedResults.push(results.slice(i, i + subjectsPerRow));
-  }
-  const numBlocks = chunkedResults.length;
-
-  const logoSize = 160;
-  const logoHeight = 160;
-  const headerTextHeight = 200;
-  const dividerHeight = 40;
-  const titleHeight = 140; // Banner size + gap
-  const studentHeight = 90;
-  const tableBlockHeight = 180; // 2 rows of 90px each
-  const tableGap = 30;
-  const resultsBoxHeight = 170; // Box + gap
-
-  const totalTableHeight = numBlocks * tableBlockHeight + (numBlocks - 1) * tableGap;
-  const totalContentHeight = logoHeight + 40 + headerTextHeight + dividerHeight + titleHeight + studentHeight + totalTableHeight + resultsBoxHeight;
-
-  // Start Y coordinate for vertical centering
-  const startY = Math.max(80, (H - totalContentHeight) / 2);
-
-  // ─────────────────────────────────────────
-  // 6. TOP LOGO (Centered)
-  // ─────────────────────────────────────────
+  // A. Center Logo
   const logoCY = startY + logoSize / 2;
   if (logoImg) {
     drawLogoImage(ctx, logoImg, W / 2, logoCY, logoSize);
@@ -247,287 +216,169 @@ export const generateCertificatePDF = async ({
     drawGeometricSeal(ctx, W / 2, logoCY, logoSize / 2, '#0F172A', '#C9A84C', true);
   }
 
-  // ─────────────────────────────────────────
-  // 7. HEADER TEXT
-  // ─────────────────────────────────────────
-  ctx.fillStyle = '#1E293B';
-  ctx.textAlign = 'center';
-
-  // Ministry
-  ctx.font = 'bold 28px Tajawal, Arial, sans-serif';
-  ctx.fillText('وزارة التعليم العالي والبحث العلمي', W / 2, startY + 210);
-
-  // University & College Name
-  ctx.font = 'bold 26px Tajawal, Arial, sans-serif';
-  ctx.fillText(`${university?.name || 'الجامعة'} - ${college?.name || 'الكلية'}`, W / 2, startY + 255);
-
-  // Department & Stage & Study Type
-  ctx.font = '24px Tajawal, Arial, sans-serif';
-  ctx.fillStyle = '#475569';
-  const stageName = student.stages?.name || student.stage || '-';
-  ctx.fillText(
-    `قسم ${department?.name || '-'} | المرحلة: ${stageName} | الدراسة: ${student.study_type || 'صباحي'}`,
-    W / 2,
-    startY + 300
-  );
-
-  // Bismillah
+  // B. Right Aligned Text
   ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 30px Tajawal, Arial, sans-serif';
-  ctx.fillText('بسم الله الرحمن الرحيم', W / 2, startY + 355);
-
-  // ─────────────────────────────────────────
-  // 8. GOLD DIVIDER LINE
-  // ─────────────────────────────────────────
-  const dividerY = startY + 395;
-  ctx.strokeStyle = '#C9A84C';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(100, dividerY);
-  ctx.lineTo(W / 2 - 60, dividerY);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(W / 2 + 60, dividerY);
-  ctx.lineTo(W - 100, dividerY);
-  ctx.stroke();
-
-  // Diamond
-  ctx.fillStyle = '#C9A84C';
-  ctx.beginPath();
-  ctx.moveTo(W / 2, dividerY - 14);
-  ctx.lineTo(W / 2 + 14, dividerY);
-  ctx.lineTo(W / 2, dividerY + 14);
-  ctx.lineTo(W / 2 - 14, dividerY);
-  ctx.closePath();
-  ctx.fill();
-
-  // ─────────────────────────────────────────
-  // 9. DOCUMENT TITLE BANNER
-  // ─────────────────────────────────────────
-  const titleY = dividerY + 55;
-  const titleText = `نتائج امتحانات الطلبة للعام الدراسي ${academicYear}`;
-  ctx.font = 'bold 36px Tajawal, Arial, sans-serif';
-  const titleW = ctx.measureText(titleText).width;
-
-  const bannerPadX = 80, bannerPadY = 22;
-  const bW = titleW + bannerPadX * 2;
-  const bH = 76;
-  const bX = W / 2 - bW / 2;
-  const bY = titleY - 10;
-  const bR = 16;
-
-  // Gold tinted background
-  ctx.fillStyle = 'rgba(201,168,76,0.06)';
-  roundRect(bX, bY, bW, bH, bR);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(201,168,76,0.4)';
-  ctx.lineWidth = 2;
-  roundRect(bX, bY, bW, bH, bR);
-  ctx.stroke();
-
-  ctx.fillStyle = '#0F172A';
-  ctx.textAlign = 'center';
-  ctx.fillText(titleText, W / 2, titleY + bH / 2 + 2);
-
-  // ─────────────────────────────────────────
-  // 10. STUDENT DETAILS ROW
-  // ─────────────────────────────────────────
-  const studentY = bY + bH + 46;
-  ctx.font = 'bold 28px Tajawal, Arial, sans-serif';
-  ctx.fillStyle = '#1E293B';
   ctx.textAlign = 'right';
-  ctx.fillText(`اسم الطالب: ${student.full_name}`, W - 110, studentY);
+  ctx.font = 'bold 24px Tajawal, Arial, sans-serif';
+  ctx.fillText('وزارة التعليم العالي والبحث العلمي', W - 100, startY + 50);
+  ctx.fillText(university?.name || college?.university || 'كلية السلام الجامعة', W - 100, startY + 95);
+  ctx.fillText(`قسم ${department?.name || '-'}`, W - 100, startY + 140);
+
+  // C. Left Aligned Text
   ctx.textAlign = 'left';
-  ctx.fillText(`الرقم الجامعي: ${student.student_number}`, 110, studentY);
+  ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
+  const stageName = student.stages?.name || student.stage || '-';
+  const studyTypeText = student.study_type === 'مسائي' ? 'المسائية' : 'الصباحية';
+  ctx.fillText(`المرحلة: ${stageName}`, 100, startY + 50);
+  ctx.fillText(`الدراسة: ${studyTypeText}`, 100, startY + 95);
 
   // ─────────────────────────────────────────
-  // 11. RESULTS FORMAL TABLE (GRID)
+  // 6. TITLE
   // ─────────────────────────────────────────
-  const drawFormalTable = (chunk, startY) => {
-    const tableLeft = 80;
-    const tableRight = W - 80;
-    const tableWidth = tableRight - tableLeft;
-    
-    // Width of the first header column ("المادة والوحدات" or "التقدير")
-    const labelColW = 220;
-    
-    // Remaining width is distributed among the 5 subjects
-    const subjectsCount = 5;
-    const subjectBlockW = (tableWidth - labelColW) / subjectsCount;
-    
-    const rowH = 90; // Height of each row
-    
-    // Draw borders & content for Row 1: Subjects & Units
-    // --------------------------------------------------
-    // First cell: "المادة والوحدات"
-    ctx.fillStyle = '#F1F5F9';
-    ctx.fillRect(tableLeft, startY, labelColW, rowH);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2.5;
-    ctx.strokeRect(tableLeft, startY, labelColW, rowH);
-    
-    ctx.fillStyle = '#0F172A';
-    ctx.textAlign = 'center';
-    ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
-    ctx.fillText('المادة والوحدات', tableLeft + labelColW / 2, startY + 54);
-    
-    // Draw subject columns
-    for (let i = 0; i < subjectsCount; i++) {
-      const item = chunk[i];
-      const x = tableLeft + labelColW + i * subjectBlockW;
-      
-      const courseNameW = subjectBlockW * 0.72;
-      const unitsW = subjectBlockW * 0.28;
-      
-      // Draw subject name cell
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(x, startY, courseNameW, rowH);
-      ctx.strokeRect(x, startY, courseNameW, rowH);
-      
-      // Draw units cell
-      ctx.fillStyle = '#F8FAFC';
-      ctx.fillRect(x + courseNameW, startY, unitsW, rowH);
-      ctx.strokeRect(x + courseNameW, startY, unitsW, rowH);
-      
-      if (item) {
-        // Draw Course Name
-        ctx.fillStyle = '#0F172A';
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 20px Tajawal, Arial, sans-serif';
-        let courseName = item.courses?.name || 'مادة';
-        if (courseName.length > 20) {
-          courseName = courseName.slice(0, 18) + '..';
-        }
-        ctx.fillText(courseName, x + courseNameW / 2, startY + 54);
-        
-        // Draw Units value
-        ctx.fillStyle = '#334155';
-        ctx.font = 'bold 20px Tajawal, Arial, sans-serif';
-        ctx.fillText(String(item.courses?.units || 1), x + courseNameW + unitsW / 2, startY + 54);
-      } else {
-        // Draw empty space/dashes if no subject
-        ctx.fillStyle = '#CBD5E1';
-        ctx.textAlign = 'center';
-        ctx.font = '20px Tajawal, Arial, sans-serif';
-        ctx.fillText('-', x + courseNameW / 2, startY + 54);
-        ctx.fillText('-', x + courseNameW + unitsW / 2, startY + 54);
-      }
-    }
-    
-    // Draw borders & content for Row 2: Grades (التقدير)
-    // --------------------------------------------------
-    const gradeStartY = startY + rowH;
-    
-    // First cell: "التقدير"
-    ctx.fillStyle = '#F1F5F9';
-    ctx.fillRect(tableLeft, gradeStartY, labelColW, rowH);
-    ctx.strokeRect(tableLeft, gradeStartY, labelColW, rowH);
-    
-    ctx.fillStyle = '#0F172A';
-    ctx.textAlign = 'center';
-    ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
-    ctx.fillText('التقدير', tableLeft + labelColW / 2, gradeStartY + 54);
-    
-    // Draw grade columns (merged for each subject)
-    for (let i = 0; i < subjectsCount; i++) {
-      const item = chunk[i];
-      const x = tableLeft + labelColW + i * subjectBlockW;
-      
-      // Merge across both sub-columns
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(x, gradeStartY, subjectBlockW, rowH);
-      ctx.strokeRect(x, gradeStartY, subjectBlockW, rowH);
-      
-      if (item) {
-        const grade = item.grade_label || '';
-        
-        // Text styling based on grade
-        const gradeColors = {
-          'امتياز': '#B45309',
-          'جيد جداً': '#047857',
-          'جيد': '#1D4ED8',
-          'متوسط': '#D97706',
-          'مقبول': '#4B5563',
-          'ضعيف': '#B91C1C',
-        };
-        ctx.fillStyle = gradeColors[grade] || '#0F172A';
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
-        ctx.fillText(grade, x + subjectBlockW / 2, gradeStartY + 54);
-      } else {
-        ctx.fillStyle = '#CBD5E1';
-        ctx.textAlign = 'center';
-        ctx.font = '20px Tajawal, Arial, sans-serif';
-        ctx.fillText('-', x + subjectBlockW / 2, gradeStartY + 54);
-      }
-    }
-  };
-
-  const tableStartY = studentY + 34;
+  const titleY = startY + logoSize + 40;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 36px Tajawal, Arial, sans-serif';
+  ctx.fillText('النتيجة النهائية', W / 2, titleY);
   
-  chunkedResults.forEach((chunk, idx) => {
-    const chunkY = tableStartY + idx * (tableBlockHeight + tableGap);
-    drawFormalTable(chunk, chunkY);
-  });
+  ctx.font = 'bold 30px Tajawal, Arial, sans-serif';
+  ctx.fillText(academicYear, W / 2, titleY + 45);
 
-  const tableEndY = tableStartY + numBlocks * tableBlockHeight + (numBlocks - 1) * tableGap;
+  ctx.font = '22px Tajawal, Arial, sans-serif';
+  ctx.fillStyle = '#334155';
+  ctx.fillText('ملاحظة: لا تعتبر هذه النتيجة وثيقة رسمية.', W / 2, titleY + 90);
 
   // ─────────────────────────────────────────
-  // 12. OVERALL RESULT BOX (FORMAL STYLE)
+  // 7. STUDENT INFO ROW
   // ─────────────────────────────────────────
-  const resultBoxY = tableEndY + 70;
-  const boxW = 800;
-  const boxH = 90;
-  const boxX = W / 2 - boxW / 2;
-  
-  // Draw main border
-  ctx.fillStyle = '#F8FAFC';
-  ctx.fillRect(boxX, resultBoxY, boxW, boxH);
+  const studentY = titleY + 120;
+  const boxW = W - 200; // 1214 px
+  const boxX = 100;
+  const labelW = 280;
+  const nameW = boxW - labelW;
+
+  // Outer border of student box
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 2.5;
-  ctx.strokeRect(boxX, resultBoxY, boxW, boxH);
+  ctx.strokeRect(boxX, studentY, boxW, studentRowHeight);
+
+  // Right cell: header ("اسم الطالب")
+  ctx.fillStyle = '#E5E7EB'; // light gray
+  ctx.fillRect(boxX + nameW, studentY, labelW, studentRowHeight);
+  ctx.strokeRect(boxX + nameW, studentY, labelW, studentRowHeight);
+
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 24px Tajawal, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('اسم الطالب', boxX + nameW + labelW / 2, studentY + studentRowHeight / 2 + 8);
+
+  // Left cell: student name value
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(boxX, studentY, nameW, studentRowHeight);
   
-  // Draw middle divider
-  ctx.beginPath();
-  ctx.moveTo(W / 2, resultBoxY);
-  ctx.lineTo(W / 2, resultBoxY + boxH);
-  ctx.stroke();
-  
-  // Draw labels and values
-  // Right side of box (RTL layout: Right is overall grade, Left is result status)
-  
-  // Right section: النتيجة (Result)
-  ctx.fillStyle = '#475569';
-  ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText('النتيجة الكلية:', W / 2 - 220, resultBoxY + 54);
-  
-  ctx.fillStyle = isPassed ? '#047857' : '#B91C1C';
-  ctx.font = 'bold 26px Tajawal, Arial, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText(isPassed ? 'ناجح' : 'راسب', W / 2 - 200, resultBoxY + 54);
-  
-  // Left section: التقدير العام (Overall Grade)
-  ctx.fillStyle = '#475569';
-  ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText('التقدير العام:', W / 2 + 160, resultBoxY + 54);
-  
-  const gradeColors = {
-    'امتياز': '#B45309',
-    'جيد جداً': '#047857',
-    'جيد': '#1D4ED8',
-    'متوسط': '#D97706',
-    'مقبول': '#4B5563',
-    'ضعيف': '#B91C1C',
-  };
-  ctx.fillStyle = gradeColors[overallGrade] || '#0F172A';
-  ctx.font = 'bold 26px Tajawal, Arial, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText(overallGrade || 'غير متوفر', W / 2 + 180, resultBoxY + 54);
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 24px Tajawal, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(student.full_name, boxX + nameW / 2, studentY + studentRowHeight / 2 + 8);
 
   // ─────────────────────────────────────────
-  // 13. EXPORT AS PDF
+  // 8. SIDE-BY-SIDE TABLES
+  // ─────────────────────────────────────────
+  const tablesStartY = studentY + studentRowHeight + 40;
+  const tableLeftX = 100;
+  const statusBoxW = 240;
+  const gap = 40;
+  
+  const mainTableX = tableLeftX + statusBoxW + gap;
+  const mainTableW = W - 100 - mainTableX;
+
+  // A. DRAW OVERALL STATUS TABLE (Left side)
+  const statusRowH = 65;
+  
+  const drawStatusCell = (x, y, w, h, bg, text, isHeader, textColor = '#000000') => {
+    ctx.fillStyle = bg;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(x, y, w, h);
+    
+    ctx.fillStyle = textColor;
+    ctx.font = isHeader ? 'bold 22px Tajawal, Arial, sans-serif' : 'bold 24px Tajawal, Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, x + w / 2, y + h / 2 + 8);
+  };
+
+  const statusColor = isPassed ? '#047857' : '#B91C1C';
+  const statusText = isPassed ? 'ناجح' : 'راسب';
+  
+  drawStatusCell(tableLeftX, tablesStartY, statusBoxW, statusRowH, '#E5E7EB', 'النتيجة', true);
+  drawStatusCell(tableLeftX, tablesStartY + statusRowH, statusBoxW, statusRowH, '#FFFFFF', statusText, false, statusColor);
+  drawStatusCell(tableLeftX, tablesStartY + statusRowH * 2, statusBoxW, statusRowH, '#E5E7EB', 'التقدير', true);
+  drawStatusCell(tableLeftX, tablesStartY + statusRowH * 3, statusBoxW, statusRowH, '#FFFFFF', overallGrade || 'غير متوفر', false, statusColor);
+
+  // B. DRAW MAIN SUBJECTS TABLE (Right side)
+  // Header row
+  const subColW = mainTableW * 0.70; // 70% for subject name
+  const gradeColW = mainTableW - subColW; // 30% for grade label
+
+  // Draw table header
+  ctx.fillStyle = '#E5E7EB';
+  ctx.fillRect(mainTableX, tablesStartY, subColW, tableHeaderH);
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(mainTableX, tablesStartY, subColW, tableHeaderH);
+
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('المادة', mainTableX + subColW / 2, tablesStartY + tableHeaderH / 2 + 8);
+
+  ctx.fillStyle = '#E5E7EB';
+  ctx.fillRect(mainTableX + subColW, tablesStartY, gradeColW, tableHeaderH);
+  ctx.strokeRect(mainTableX + subColW, tablesStartY, gradeColW, tableHeaderH);
+
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
+  ctx.fillText('التقدير', mainTableX + subColW + gradeColW / 2, tablesStartY + tableHeaderH / 2 + 8);
+
+  // Draw subject rows
+  results.forEach((item, index) => {
+    const rowY = tablesStartY + tableHeaderH + index * rowH;
+    
+    // Draw subject name & units cell
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(mainTableX, rowY, subColW, rowH);
+    ctx.strokeRect(mainTableX, rowY, subColW, rowH);
+    
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 20px Tajawal, Arial, sans-serif';
+    ctx.textAlign = 'center';
+    
+    const units = item.courses?.units || 1;
+    const courseText = `${item.courses?.name || 'مادة'} (${units})`;
+    ctx.fillText(courseText, mainTableX + subColW / 2, rowY + rowH / 2 + 8);
+
+    // Draw grade cell
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(mainTableX + subColW, rowY, gradeColW, rowH);
+    ctx.strokeRect(mainTableX + subColW, rowY, gradeColW, rowH);
+    
+    const grade = item.grade_label || '';
+    const gradeColors = {
+      'امتياز': '#B45309',
+      'جيد جداً': '#047857',
+      'جيد': '#1D4ED8',
+      'متوسط': '#D97706',
+      'مقبول': '#4B5563',
+      'ضعيف': '#B91C1C',
+    };
+    ctx.fillStyle = gradeColors[grade] || '#000000';
+    ctx.font = 'bold 20px Tajawal, Arial, sans-serif';
+    ctx.fillText(grade, mainTableX + subColW + gradeColW / 2, rowY + rowH / 2 + 8);
+  });
+
+  // ─────────────────────────────────────────
+  // 9. EXPORT AS PDF
   // ─────────────────────────────────────────
   const imgData = canvas.toDataURL('image/jpeg', 0.92);
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
