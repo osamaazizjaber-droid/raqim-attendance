@@ -82,32 +82,13 @@ const drawUniversityLogo = (ctx, cx, cy, r, primaryColor = '#0F172A', accentColo
 
 /**
  * Draw a logo image centered at (cx, cy) fitting within maxSize x maxSize.
- * Draws a circular clip mask around it.
+ * Drawn directly without circular clipping or border rings.
  */
 const drawLogoImage = (ctx, img, cx, cy, maxSize) => {
-  const r = maxSize / 2;
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-  ctx.clip();
-
   const scale = Math.min(maxSize / img.width, maxSize / img.height);
   const w = img.width * scale;
   const h = img.height * scale;
   ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
-  ctx.restore();
-
-  // Decorative ring around the logo
-  ctx.strokeStyle = '#C9A84C';
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r + 6, 0, 2 * Math.PI);
-  ctx.stroke();
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r + 14, 0, 2 * Math.PI);
-  ctx.stroke();
 };
 
 /**
@@ -182,8 +163,18 @@ export const generateCertificatePDF = async ({
   // 4. FAINT WATERMARK (centre)
   // ─────────────────────────────────────────
   ctx.save();
-  ctx.globalAlpha = 0.035;
-  drawUniversityLogo(ctx, W / 2, H / 2 + 40, 240, '#0F172A', '#C9A84C');
+  ctx.globalAlpha = 0.08;
+  if (logoImg) {
+    // Draw the actual loaded logo image as a large transparent watermark in the background
+    const watermarkSize = 520;
+    const scale = Math.min(watermarkSize / logoImg.width, watermarkSize / logoImg.height);
+    const w = logoImg.width * scale;
+    const h = logoImg.height * scale;
+    ctx.drawImage(logoImg, W / 2 - w / 2, H / 2 + 80 - h / 2, w, h);
+  } else {
+    // Fallback: draw the university shield emblem
+    drawUniversityLogo(ctx, W / 2, H / 2 + 40, 240, '#0F172A', '#C9A84C');
+  }
   ctx.restore();
 
   // ─────────────────────────────────────────
@@ -208,7 +199,14 @@ export const generateCertificatePDF = async ({
   // C. Left Aligned Text
   ctx.textAlign = 'left';
   ctx.font = 'bold 22px Tajawal, Arial, sans-serif';
-  const stageName = student.stages?.name || student.stage || '-';
+  
+  const stageObj = student.stages || student.stage;
+  const stageName = 
+    (stageObj && typeof stageObj === 'object' && !Array.isArray(stageObj) && stageObj.name) ||
+    (Array.isArray(stageObj) && stageObj[0]?.name) ||
+    (typeof stageObj === 'string' && stageObj) ||
+    '-';
+
   const studyTypeText = student.study_type === 'مسائي' ? 'المسائية' : 'الصباحية';
   ctx.fillText(`المرحلة: ${stageName}`, 100, startY + 50);
   ctx.fillText(`الدراسة: ${studyTypeText}`, 100, startY + 95);
@@ -217,7 +215,7 @@ export const generateCertificatePDF = async ({
   // ─────────────────────────────────────────
   // 6. TITLE
   // ─────────────────────────────────────────
-  const titleY = startY + logoSize + 40;
+  const titleY = startY + logoSize + 75; // Increased gap between logo and academic year
   ctx.textAlign = 'center';
   ctx.fillStyle = '#000000';
   ctx.font = 'bold 36px Tajawal, Arial, sans-serif';
@@ -230,7 +228,7 @@ export const generateCertificatePDF = async ({
   // ─────────────────────────────────────────
   // 7. STUDENT INFO ROW
   // ─────────────────────────────────────────
-  const studentY = titleY + 120;
+  const studentY = titleY + 100; // Adjusted spacing to flow cleanly
   const boxW = W - 200; // 1214 px
   const boxX = 100;
   const labelW = 280;

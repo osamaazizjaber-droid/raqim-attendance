@@ -70,45 +70,46 @@
         ];
 
 
-        // Star shape in center
-        ctx.fillStyle = accentColor;
-        const starPoints = 8;
-        const innerR = r * 0.22;
-        const outerR = r * 0.42;
-        ctx.beginPath();
-        for (let i = 0; i < starPoints * 2; i++) {
-            const angle = (i * Math.PI) / starPoints - Math.PI / 2;
-            const radius = i % 2 === 0 ? outerR : innerR;
-            if (i === 0) ctx.moveTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
-            else ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
-        }
-        ctx.closePath();
-        ctx.fill();
-
-        // Center dot
-        ctx.fillStyle = primaryColor;
-        ctx.beginPath();
-        ctx.arc(cx, cy, r * 0.12, 0, 2 * Math.PI);
-        ctx.fill();
-
-        // Draw outer borders if requested (to match the logo image frame)
-        if (drawOuterBorders) {
-            const scale = r / 80;
-
-            // Decorative gold ring
-            ctx.strokeStyle = accentColor;
-            ctx.lineWidth = 5 * scale;
+        const drawGeometricSeal = (ctx, cx, cy, r, primaryColor = '#0F172A', accentColor = '#C9A84C', drawOuterBorders = false) => {
+            // Star shape in center
+            ctx.fillStyle = accentColor;
+            const starPoints = 8;
+            const innerR = r * 0.22;
+            const outerR = r * 0.42;
             ctx.beginPath();
-            ctx.arc(cx, cy, r + 6 * scale, 0, 2 * Math.PI);
-            ctx.stroke();
+            for (let i = 0; i < starPoints * 2; i++) {
+                const angle = (i * Math.PI) / starPoints - Math.PI / 2;
+                const radius = i % 2 === 0 ? outerR : innerR;
+                if (i === 0) ctx.moveTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+                else ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+            }
+            ctx.closePath();
+            ctx.fill();
 
-            // Decorative slate ring
-            ctx.strokeStyle = primaryColor;
-            ctx.lineWidth = 2 * scale;
+            // Center dot
+            ctx.fillStyle = primaryColor;
             ctx.beginPath();
-            ctx.arc(cx, cy, r + 14 * scale, 0, 2 * Math.PI);
-            ctx.stroke();
-        }
+            ctx.arc(cx, cy, r * 0.12, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Draw outer borders if requested (to match the logo image frame)
+            if (drawOuterBorders) {
+                const scale = r / 80;
+
+                // Decorative gold ring
+                ctx.strokeStyle = accentColor;
+                ctx.lineWidth = 5 * scale;
+                ctx.beginPath();
+                ctx.arc(cx, cy, r + 6 * scale, 0, 2 * Math.PI);
+                ctx.stroke();
+
+                // Decorative slate ring
+                ctx.strokeStyle = primaryColor;
+                ctx.lineWidth = 2 * scale;
+                ctx.beginPath();
+                ctx.arc(cx, cy, r + 14 * scale, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
         };
 
         const render = () => {
@@ -147,13 +148,13 @@
 
             // Watermark (Center)
             ctx.save();
-            ctx.globalAlpha = 0.03;
-            drawGeometricSeal(ctx, W / 2, H / 2 + 80, 260, '#0F172A', '#C9A84C');
+            ctx.globalAlpha = 0.08;
+            drawGeometricSeal(ctx, W / 2, H / 2 + 80, 260, '#0F172A', '#C9A84C', false);
             ctx.restore();
 
-            // Center Logo
+            // Center Logo - NO Circles
             const logoCY = startY + logoSize / 2;
-            drawGeometricSeal(ctx, W / 2, logoCY, logoSize / 2, '#0F172A', '#C9A84C', true);
+            drawGeometricSeal(ctx, W / 2, logoCY, logoSize / 2, '#0F172A', '#C9A84C', false);
 
             // Right Aligned Text
             ctx.fillStyle = '#0F172A';
@@ -170,16 +171,19 @@
             ctx.fillText(`المرحلة: ${stageName}`, 100, startY + 50);
             ctx.fillText(`الدراسة: ${studyTypeText}`, 100, startY + 95);
 
-
-            ctx.font = 'bold 30px Tajawal, Arial, sans-serif';
-            ctx.fillText(academicYear, W / 2, titleY + 45);
+            // 6. TITLE
+            const titleY = startY + logoSize + 75;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 36px Tajawal, Arial, sans-serif';
+            ctx.fillText(academicYear, W / 2, titleY);
 
             ctx.font = '22px Tajawal, Arial, sans-serif';
             ctx.fillStyle = '#334155';
-            ctx.fillText('ملاحظة: لا تعتبر هذه النتيجة وثيقة رسمية.', W / 2, titleY + 90);
+            ctx.fillText('ملاحظة: لا تعتبر هذه النتيجة وثيقة رسمية.', W / 2, titleY + 45);
 
             // Student Info Row
-            const studentY = titleY + 120;
+            const studentY = titleY + 100;
             const boxW = W - 200;
             const boxX = 100;
             const labelW = 280;
