@@ -168,7 +168,7 @@ export default function CollegeAdminResults() {
 
       const { data: allStudentResults } = await supabase
         .from('results')
-        .select('*, courses(name)')
+        .select('*, courses(name, units)')
         .in('student_id', studentIds)
         .eq('academic_year', academicYear);
 

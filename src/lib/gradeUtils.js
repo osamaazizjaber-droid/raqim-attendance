@@ -21,8 +21,9 @@ const GRADE_FROM_SCORE = [
  */
 export const computeOverallGrade = (results) => {
   if (!results || results.length === 0) return 'ضعيف';
-  const totalPoints = results.reduce((sum, r) => sum + (GRADE_SCORES[r.grade_label] || 1), 0);
-  const avg = totalPoints / results.length;
+  const totalPoints = results.reduce((sum, r) => sum + (GRADE_SCORES[r.grade_label] || 1) * (r.courses?.units || 1), 0);
+  const totalUnits = results.reduce((sum, r) => sum + (r.courses?.units || 1), 0);
+  const avg = totalPoints / (totalUnits || 1);
   return GRADE_FROM_SCORE.find(g => avg >= g.min)?.label || 'ضعيف';
 };
 

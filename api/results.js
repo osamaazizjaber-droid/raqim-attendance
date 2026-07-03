@@ -45,7 +45,7 @@ export default async function handler(req, res) {
     // جلب نتائج امتحانات الطالب
     const { data: results, error: resErr } = await supabase
       .from('results')
-      .select('*, courses(name)')
+      .select('*, courses(name, units)')
       .eq('student_id', student.id)
       .order('created_at', { ascending: true });
 
