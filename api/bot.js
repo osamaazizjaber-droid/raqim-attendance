@@ -438,6 +438,9 @@ async function handleViewResults(chatId) {
     responseText += `🏫 <b>الجامعة والكلية:</b> ${student.colleges?.university || 'جامعة رقيم'} - ${student.colleges?.name || '-'}\n`;
     responseText += `🎓 <b>القسم والمرحلة:</b> ${student.departments?.name || '-'} (${student.stages?.name || 'المرحلة الدراسية'})\n`;
     responseText += `──────────────────\n`;
+    responseText += `\n👨‍💻 <b>مطور النظام:</b> م.اسامة العياش\n`;
+    responseText += `✉️ <b>البريد:</b> osamaazizjaber@gmail.com\n`;
+    responseText += `📞 <b>هاتف / واتساب:</b> +9647716739456\n`;
 
     // تجهيز أزرار تحميل الشهادات المتوفرة للتحميل المباشر داخل البوت (فقط للسنوات التي تمتلك نتائج نشطة ولم تُحذف)
     const inlineButtons = [];
