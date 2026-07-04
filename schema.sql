@@ -620,4 +620,8 @@ TO authenticated
 USING (is_super_admin())
 WITH CHECK (is_super_admin());
 
+-- تفعيل الـ Realtime للبث اللحظي للرسائل الجماعية
+ALTER PUBLICATION supabase_realtime ADD TABLE telegram_broadcast_requests;
+
+
 

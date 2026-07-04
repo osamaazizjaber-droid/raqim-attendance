@@ -477,6 +477,28 @@ supabase
   )
   .subscribe();
 
+// فحص دوري كل 30 ثانية كإجراء احتياطي في حال انقطاع أو عدم تفعيل Realtime للجدول الجديد
+setInterval(async () => {
+  try {
+    const { data: pendingRequests, error } = await supabase
+      .from('telegram_broadcast_requests')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    if (pendingRequests && pendingRequests.length > 0) {
+      console.log(`⚙️ [Periodic Check] وجدنا (${pendingRequests.length}) طلبات إرسال معلقة. جاري معالجتها...`);
+      for (const req of pendingRequests) {
+        await processBroadcastRequest(req);
+      }
+    }
+  } catch (err) {
+    console.error('Error in periodic broadcast check:', err.message);
+  }
+}, 30000);
+
 // الاشتراك اللحظي في تحديثات جدول الطلاب لمزامنة ذاكرة التخزين المؤقت (Cache Sync)
 supabase
   .channel('students_cache_sync')
