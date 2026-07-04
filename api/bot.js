@@ -437,34 +437,17 @@ async function handleViewResults(chatId) {
     responseText += `🆔 <b>الرقم الجامعي:</b> ${student.student_number}\n`;
     responseText += `🏫 <b>الجامعة والكلية:</b> ${student.colleges?.university || 'جامعة رقيم'} - ${student.colleges?.name || '-'}\n`;
     responseText += `🎓 <b>القسم والمرحلة:</b> ${student.departments?.name || '-'} (${student.stages?.name || 'المرحلة الدراسية'})\n`;
-    responseText += `──────────────────\n`;
+    responseText += `──────────────────\n\n`;
 
-    // تجميع النتائج حسب العام الدراسي
-    const resultsByYear = {};
-    results.forEach(res => {
-      if (!resultsByYear[res.academic_year]) {
-        resultsByYear[res.academic_year] = [];
-      }
-      resultsByYear[res.academic_year].push(res);
-    });
-
-    for (const year of Object.keys(resultsByYear)) {
-      responseText += `📅 <b>العام الدراسي: ${year}</b>\n\n`;
-      resultsByYear[year].forEach((res, index) => {
-        const score = parseFloat(res.score);
-        const statusEmoji = score >= 50 ? '🟢' : '🔴';
-        responseText += `${statusEmoji} ${index + 1}. <b>${res.courses?.name || 'مادة'}</b>: <code>${score}</code> (${res.grade_label})\n`;
-      });
-      responseText += `──────────────────\n`;
-    }
-
-    responseText += `\n💡 <i>ملاحظة: درجة النجاح الصغرى للمواد هي 50.</i>`;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://www.sys-wms.pro';
+    const resultsUrl = `${frontendUrl}/results?q=${student.student_number}`;
+    responseText += `<a href="${resultsUrl}">يرجى الضغط هنا للحصول على النتيجة</a>`;
 
     // تجهيز أزرار تحميل الشهادات المتوفرة للتحميل المباشر داخل البوت (فقط للسنوات التي تمتلك نتائج نشطة ولم تُحذف)
     const inlineButtons = [];
     if (certificates && certificates.length > 0) {
       certificates.forEach(cert => {
-        if (cert.pdf_url && resultsByYear[cert.academic_year]) {
+        if (cert.pdf_url && results.some(res => res.academic_year === cert.academic_year)) {
           inlineButtons.push([
             {
               text: `📥 تحميل شهادة عام ${cert.academic_year} (PDF)`,
