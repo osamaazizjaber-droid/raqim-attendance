@@ -12,6 +12,7 @@ import Login from './pages/professor/Login';
 // المشرف العام (Super Admin)
 import SuperAdminDashboard from './pages/super-admin/Dashboard';
 import SuperAdminColleges from './pages/super-admin/Colleges';
+import SuperAdminBroadcast from './pages/super-admin/Broadcast';
 
 // مدير الكلية (College Admin)
 import CollegeAdminDashboard from './pages/college-admin/Dashboard';
@@ -197,6 +198,11 @@ export default function App() {
             <Route path="/super-admin/colleges" element={
               <SuperAdminRoute>
                 <SuperAdminColleges />
+              </SuperAdminRoute>
+            } />
+            <Route path="/super-admin/broadcast" element={
+              <SuperAdminRoute>
+                <SuperAdminBroadcast />
               </SuperAdminRoute>
             } />
 

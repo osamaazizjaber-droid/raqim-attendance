@@ -598,3 +598,26 @@ CREATE POLICY "Allow authenticated delete on certificates"
 ON storage.objects FOR DELETE TO authenticated
 USING (bucket_id = 'certificates');
 
+-- =========================================================================
+-- 19. طابور طلبات الإرسال الجماعي عبر البوت (Telegram Broadcast Queue)
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS telegram_broadcast_requests (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    audience text NOT NULL CHECK (audience IN ('students', 'professors', 'all')),
+    message text NOT NULL,
+    status text DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+    error_message text,
+    created_at timestamptz DEFAULT now()
+);
+
+-- Enable RLS on the new table
+ALTER TABLE telegram_broadcast_requests ENABLE ROW LEVEL SECURITY;
+
+-- Allow authenticated super-admins full control on telegram_broadcast_requests
+CREATE POLICY "Allow super-admins full control on telegram_broadcast_requests"
+ON telegram_broadcast_requests
+TO authenticated
+USING (is_super_admin())
+WITH CHECK (is_super_admin());
+
+

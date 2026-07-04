@@ -6,7 +6,8 @@ import {
   GraduationCap, 
   LogOut, 
   Activity,
-  Calendar
+  Calendar,
+  Send
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
@@ -53,6 +54,13 @@ export function SuperAdminSidebar({ activePage }) {
         >
           <Building size={20} />
           <span>إدارة الكليات والاشتراكات</span>
+        </Link>
+        <Link 
+          to="/super-admin/broadcast" 
+          className={`${styles.navLink} ${activePage === 'broadcast' ? styles.navLinkActive : ''}`}
+        >
+          <Send size={20} />
+          <span>الإرسال الجماعي (تيليجرام)</span>
         </Link>
         <button 
           onClick={handleLogout}

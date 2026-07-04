@@ -220,6 +220,117 @@ async function processOldPendingRequests() {
 // تشغيل فحص معلقات إعادة إرسال البطاقات
 processOldPendingRequests();
 
+// --- طابور معالجة طلبات الإرسال الجماعي (Broadcast Queue) ---
+
+async function processBroadcastRequest(request) {
+  const { id: requestId, audience, message } = request;
+  console.log(`📢 البدء في معالجة طلب الإرسال الجماعي (${requestId}) للفئة: ${audience}`);
+
+  try {
+    // 1. تحديث الحالة إلى جاري المعالجة
+    await supabase
+      .from('telegram_broadcast_requests')
+      .update({ status: 'processing' })
+      .eq('id', requestId);
+
+    // 2. جلب المستلمين المناسبين
+    let recipients = [];
+    if (audience === 'students' || audience === 'all') {
+      const { data: students, error: studErr } = await supabase
+        .from('students')
+        .select('id, full_name, telegram_chat_id')
+        .not('telegram_chat_id', 'is', null);
+
+      if (studErr) throw studErr;
+      students.forEach(s => {
+        recipients.push({ name: s.full_name, chatId: s.telegram_chat_id, type: 'طالب' });
+      });
+    }
+
+    if (audience === 'professors' || audience === 'all') {
+      const { data: professors, error: profErr } = await supabase
+        .from('professors')
+        .select('id, name, telegram_chat_id')
+        .not('telegram_chat_id', 'is', null);
+
+      if (profErr) throw profErr;
+      professors.forEach(p => {
+        recipients.push({ name: p.name, chatId: p.telegram_chat_id, type: 'أستاذ' });
+      });
+    }
+
+    // إزالة التكرار
+    const uniqueRecipients = [];
+    const seenChats = new Set();
+    recipients.forEach(r => {
+      if (!seenChats.has(r.chatId)) {
+        seenChats.add(r.chatId);
+        uniqueRecipients.push(r);
+      }
+    });
+
+    console.log(`📢 جاري إرسال الرسالة الجماعية إلى ${uniqueRecipients.length} مستخدم...`);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < uniqueRecipients.length; i++) {
+      const user = uniqueRecipients[i];
+      try {
+        await bot.sendMessage(user.chatId, message, { parse_mode: 'HTML' });
+        successCount++;
+      } catch (sendErr) {
+        failCount++;
+        console.error(`❌ فشل إرسال الرسالة إلى ${user.name} (${user.chatId}):`, sendErr.message);
+      }
+      // تأخير 100 مللي ثانية لتجنب تجاوز الحد الأقصى لتليجرام
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // 3. تحديث الحالة إلى مكتمل مع كتابة التفاصيل
+    await supabase
+      .from('telegram_broadcast_requests')
+      .update({
+        status: 'completed',
+        error_message: `تم الإرسال بنجاح لـ ${successCount} مستخدم، وفشل لـ ${failCount}`
+      })
+      .eq('id', requestId);
+
+    console.log(`✅ انتهت معالجة طلب الإرسال الجماعي بنجاح. نجح: ${successCount}، فشل: ${failCount}`);
+
+  } catch (err) {
+    console.error(`❌ فشل معالجة طلب الإرسال الجماعي (${requestId}):`, err.message);
+    await supabase
+      .from('telegram_broadcast_requests')
+      .update({
+        status: 'failed',
+        error_message: err.message || 'حدث خطأ غير معروف'
+      })
+      .eq('id', requestId);
+  }
+}
+
+async function processOldBroadcastRequests() {
+  try {
+    const { data: pendingRequests, error } = await supabase
+      .from('telegram_broadcast_requests')
+      .select('*')
+      .eq('status', 'pending');
+
+    if (error) throw error;
+
+    if (pendingRequests && pendingRequests.length > 0) {
+      console.log(`⚙️ وجدنا (${pendingRequests.length}) طلبات إرسال جماعي معلقة من قبل. جاري معالجتها...`);
+      for (const req of pendingRequests) {
+        await processBroadcastRequest(req);
+      }
+    }
+  } catch (err) {
+    console.error('Error processing old broadcast requests:', err);
+  }
+}
+
+
 // --- طابور معالجة طلبات إنشاء المستخدمين (المدراء والأساتذة) ---
 
 async function processUserCreationRequest(request) {
@@ -342,6 +453,26 @@ supabase
     async (payload) => {
       console.log('🔔 استقبلنا طلب إعادة إرسال كرت جديد عبر Realtime:', payload.new.id);
       await processResendRequest(payload.new);
+    }
+  )
+  .subscribe();
+
+// تشغيل فحص معلقات الإرسال الجماعي عند إقلاع البوت
+processOldBroadcastRequests();
+
+// الاشتراك اللحظي في طابور الإرسال الجماعي
+supabase
+  .channel('telegram_broadcast_queue')
+  .on(
+    'postgres_changes',
+    {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'telegram_broadcast_requests',
+    },
+    async (payload) => {
+      console.log('🔔 استقبلنا طلب إرسال جماعي جديد عبر Realtime:', payload.new.id);
+      await processBroadcastRequest(payload.new);
     }
   )
   .subscribe();
