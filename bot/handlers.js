@@ -305,11 +305,7 @@ export const handleViewResults = async (bot, chatId) => {
     responseText += `🆔 <b>الرقم الجامعي:</b> ${student.student_number}\n`;
     responseText += `🏫 <b>الجامعة والكلية:</b> ${student.colleges?.university || 'جامعة رقيم'} - ${student.colleges?.name || '-'}\n`;
     responseText += `🎓 <b>القسم والمرحلة:</b> ${student.departments?.name || '-'} (${student.stages?.name || 'المرحلة الدراسية'})\n`;
-    responseText += `──────────────────\n\n`;
-
-    const frontendUrl = process.env.FRONTEND_URL || 'https://www.sys-wms.pro';
-    const resultsUrl = `${frontendUrl}/results?q=${student.student_number}`;
-    responseText += `<a href="${resultsUrl}">يرجى الضغط هنا للحصول على النتيجة</a>`;
+    responseText += `──────────────────\n`;
 
     // تجهيز أزرار تحميل الشهادات المتوفرة للتحميل المباشر داخل البوت (فقط للسنوات التي تمتلك نتائج نشطة ولم تُحذف)
     const inlineButtons = [];
