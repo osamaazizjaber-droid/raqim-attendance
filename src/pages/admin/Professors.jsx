@@ -241,7 +241,7 @@ export default function AdminProfessors() {
     try {
       const { data, error } = await supabase
         .from('courses')
-        .select('*')
+        .select('*, stages(name)')
         .eq('department_id', deptId)
         .order('name', { ascending: true });
       if (error) throw error;
@@ -655,7 +655,9 @@ export default function AdminProfessors() {
             >
               <option value="">اختر المادة</option>
               {formCourses.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>
+                  {c.name} - {c.stages?.name || 'مرحلة غير محددة'}
+                </option>
               ))}
             </select>
           </div>
