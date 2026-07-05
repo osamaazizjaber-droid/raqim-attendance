@@ -30,7 +30,7 @@ export default function CollegeAdminDepartments() {
   
   // Form inputs
   const [deptForm, setDeptForm] = useState({ id: null, name: '' });
-  const [courseForm, setCourseForm] = useState({ id: null, name: '', stage_id: '', units: 1 });
+  const [courseForm, setCourseForm] = useState({ id: null, name: '', stage_id: '', units: 1, semester: 'الكورس الأول' });
 
   // Initial load
   useEffect(() => {
@@ -157,7 +157,8 @@ export default function CollegeAdminDepartments() {
           .update({ 
             name: courseForm.name, 
             stage_id: courseForm.stage_id,
-            units: parseFloat(courseForm.units) || 1
+            units: parseFloat(courseForm.units) || 1,
+            semester: courseForm.semester || 'الكورس الأول'
           })
           .eq('id', courseForm.id);
         if (error) throw error;
@@ -170,13 +171,14 @@ export default function CollegeAdminDepartments() {
             name: courseForm.name,
             stage_id: courseForm.stage_id,
             department_id: selectedDept.id,
-            units: parseFloat(courseForm.units) || 1
+            units: parseFloat(courseForm.units) || 1,
+            semester: courseForm.semester || 'الكورس الأول'
           });
         if (error) throw error;
         showToast('نجاح', 'تم إضافة المادة الدراسية بنجاح', 'success');
       }
       setIsCourseModalOpen(false);
-      setCourseForm({ id: null, name: '', stage_id: '', units: 1 });
+      setCourseForm({ id: null, name: '', stage_id: '', units: 1, semester: 'الكورس الأول' });
       fetchDeptCourses(selectedDept.id);
     } catch (err) {
       showToast('خطأ', err.message || 'فشل حفظ المادة', 'danger');
@@ -215,7 +217,8 @@ export default function CollegeAdminDepartments() {
       id: course.id,
       name: course.name,
       stage_id: course.stage_id,
-      units: course.units || 1
+      units: course.units || 1,
+      semester: course.semester || 'الكورس الأول'
     });
     setIsCourseModalOpen(true);
   };
@@ -298,7 +301,7 @@ export default function CollegeAdminDepartments() {
                       <Download size={16} />
                       <span>تحميل المواد</span>
                     </Button>
-                    <Button size="sm" onClick={() => { setCourseForm({ id: null, name: '', stage_id: stages[0]?.id || '', units: 1 }); setIsCourseModalOpen(true); }}>
+                    <Button size="sm" onClick={() => { setCourseForm({ id: null, name: '', stage_id: stages[0]?.id || '', units: 1, semester: 'الكورس الأول' }); setIsCourseModalOpen(true); }}>
                       <PlusCircle size={16} />
                       <span>إضافة مادة</span>
                     </Button>
@@ -317,6 +320,7 @@ export default function CollegeAdminDepartments() {
                           <Th>اسم المادة</Th>
                           <Th>المرحلة</Th>
                           <Th>عدد الوحدات</Th>
+                          <Th>الكورس</Th>
                           <Th>العمليات</Th>
                         </Tr>
                       </thead>
@@ -326,6 +330,7 @@ export default function CollegeAdminDepartments() {
                             <Td style={{ fontWeight: '600' }}>{course.name}</Td>
                             <Td>{course.stages?.name || '-'}</Td>
                             <Td style={{ fontWeight: 'bold', color: 'var(--accent)' }}>{course.units || 1}</Td>
+                            <Td>{course.semester || 'الكورس الأول'}</Td>
                             <Td>
                               <div style={{ display: 'flex', gap: '0.5rem' }}>
                                 <Button size="icon" variant="secondary" onClick={() => openEditCourse(course)}>
@@ -412,6 +417,18 @@ export default function CollegeAdminDepartments() {
                 value={courseForm.units}
                 onChange={e => setCourseForm({ ...courseForm, units: e.target.value })}
               />
+            </div>
+            <div className={compStyles.inputGroup}>
+              <label className={compStyles.label}>الفصل الدراسي / الكورس</label>
+               <select 
+                 className={compStyles.input}
+                 value={courseForm.semester}
+                 onChange={e => setCourseForm({ ...courseForm, semester: e.target.value })}
+                 required
+               >
+                 <option value="الكورس الأول">الكورس الأول</option>
+                 <option value="الكورس الثاني">الكورس الثاني</option>
+               </select>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
               <Button type="button" variant="secondary" onClick={() => setIsCourseModalOpen(false)}>إلغاء</Button>

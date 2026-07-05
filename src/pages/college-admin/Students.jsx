@@ -474,6 +474,29 @@ export default function CollegeAdminStudents() {
     }
   };
 
+  // Toggle Tuition Paid Status for evening students
+  const handleToggleFeesPaid = async (student) => {
+    try {
+      const newStatus = student.fees_paid !== false ? false : true;
+      const { error } = await supabase
+        .from('students')
+        .update({ fees_paid: newStatus })
+        .eq('id', student.id);
+
+      if (error) throw error;
+
+      showToast(
+        'تم التحديث ✅', 
+        `تم ${newStatus ? 'إلغاء حجب' : 'حجب'} نتيجة الطالب "${student.full_name}" بنجاح.`, 
+        'success'
+      );
+      
+      setStudents(prev => prev.map(s => s.id === student.id ? { ...s, fees_paid: newStatus } : s));
+    } catch (err) {
+      showToast('خطأ', err.message || 'فشل تحديث حالة القسط', 'danger');
+    }
+  };
+
   // Manage student courses (such as repeat courses)
   const openStudentCourses = async (student) => {
     setActiveStudent(student);
@@ -681,6 +704,7 @@ export default function CollegeAdminStudents() {
                   <Th>المرحلة</Th>
                   <Th>الدراسة</Th>
                   <Th>التيليجرام</Th>
+                  <Th>القسط (للمسائي)</Th>
                   <Th>العمليات</Th>
                 </Tr>
               </thead>
@@ -702,6 +726,28 @@ export default function CollegeAdminStudents() {
                         </div>
                       ) : (
                         <Badge variant="secondary">غير مرتبط</Badge>
+                      )}
+                    </Td>
+                    <Td style={{ minWidth: '130px' }}>
+                      {student.study_type === 'مسائي' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          {student.fees_paid !== false ? (
+                            <Badge variant="success">نشط (مستوفي) ✅</Badge>
+                          ) : (
+                            <Badge variant="danger">محجوب ❌</Badge>
+                          )}
+                          <Button 
+                            size="sm" 
+                            variant="secondary" 
+                            onClick={() => handleToggleFeesPaid(student)}
+                            style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem', height: 'auto' }}
+                            title="تعديل حالة دفع القسط وتفعيل عرض النتيجة"
+                          >
+                            تغيير
+                          </Button>
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>صباحي (معفى)</span>
                       )}
                     </Td>
                     <Td>

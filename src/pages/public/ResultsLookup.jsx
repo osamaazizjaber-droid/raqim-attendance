@@ -77,12 +77,17 @@ export default function ResultsLookup() {
     }
   };
 
-  const handleDownloadCertificate = async () => {
+  const handleDownloadCertificate = async (semester) => {
     try {
       setLoading(true);
-      const overallGrade = computeOverallGrade(results);
-      const isPassed = computeIsPassed(results);
-      const academicYear = results[0]?.academic_year || '2024/2025';
+      const semesterResults = results.filter(r => r.courses?.semester === semester);
+      if (semesterResults.length === 0) {
+        alert(`لا توجد درجات مسجلة في ${semester}`);
+        return;
+      }
+      const overallGrade = computeOverallGrade(semesterResults);
+      const isPassed = computeIsPassed(semesterResults);
+      const academicYear = semesterResults[0]?.academic_year || '2024/2025';
       const university = { name: studentData?.colleges?.university || 'جامعة رقيم' };
       const college = { name: studentData?.colleges?.name || 'الكلية' };
       const department = { name: studentData?.departments?.name || 'القسم' };
@@ -91,7 +96,7 @@ export default function ResultsLookup() {
 
       const pdfBlob = await generateCertificatePDF({
         student: studentData,
-        results,
+        results: semesterResults,
         overallGrade,
         isPassed,
         academicYear,
@@ -100,12 +105,13 @@ export default function ResultsLookup() {
         department,
         universityLogoUrl,
         collegeLogoUrl,
+        roundName: semester,
       });
 
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${studentData.full_name.replace(/\s+/g, '_')}_شهادة.pdf`;
+      link.download = `${studentData.full_name.replace(/\s+/g, '_')}_شهادة_${semester.replace(/\s+/g, '_')}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -280,55 +286,115 @@ export default function ResultsLookup() {
                 لم ترفع أي درجات أو نتائج امتحانات لهذا العام الدراسي بعد.
               </div>
             ) : (
-              <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: 'var(--bg-secondary)', fontSize: '0.85rem' }}>
-                      <th style={{ padding: '10px', borderBottom: '1px solid var(--border)' }}>المادة</th>
-                      <th style={{ padding: '10px', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>التقدير الكلي</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map(r => (
-                      <tr key={r.id} style={{ borderBottom: '1px solid var(--border)', fontSize: '0.8rem' }}>
-                        <td style={{ padding: '10px', fontWeight: '500', color: 'var(--text-primary)' }}>{r.courses?.name}</td>
-                        <td style={{ padding: '10px', textAlign: 'left' }}>
-                          <span style={{
-                            display: 'inline-block',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '12px',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold',
-                            ...getBadgeStyle(r.grade_label)
-                          }}>
-                            {r.grade_label === 'امتياز' ? '🏆 ' + r.grade_label : r.grade_label}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* نتائج الكورس الأول */}
+                {results.filter(r => r.courses?.semester === 'الكورس الأول').length > 0 && (
+                  <div>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--accent)', marginBottom: '0.5rem' }}>نتائج الكورس الأول</h4>
+                    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '0.5rem' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: 'var(--bg-secondary)', fontSize: '0.85rem' }}>
+                            <th style={{ padding: '10px', borderBottom: '1px solid var(--border)' }}>المادة</th>
+                            <th style={{ padding: '10px', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>التقدير الكلي</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {results.filter(r => r.courses?.semester === 'الكورس الأول').map(r => (
+                            <tr key={r.id} style={{ borderBottom: '1px solid var(--border)', fontSize: '0.8rem' }}>
+                              <td style={{ padding: '10px', fontWeight: '500', color: 'var(--text-primary)' }}>{r.courses?.name}</td>
+                              <td style={{ padding: '10px', textAlign: 'left' }}>
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '12px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 'bold',
+                                  ...getBadgeStyle(r.grade_label)
+                                }}>
+                                  {r.grade_label === 'امتياز' ? '🏆 ' + r.grade_label : r.grade_label}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Button 
+                      onClick={() => handleDownloadCertificate('الكورس الأول')} 
+                      disabled={loading}
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '0.5rem', 
+                        width: '100%', 
+                        backgroundColor: 'var(--success)', 
+                        color: '#ffffff',
+                        marginBottom: '1rem',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      <Download size={16} />
+                      <span>تحميل شهادة الكورس الأول (PDF)</span>
+                    </Button>
+                  </div>
+                )}
 
-            {results.length > 0 && (
-              <Button 
-                onClick={handleDownloadCertificate} 
-                disabled={loading}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  gap: '0.5rem', 
-                  width: '100%', 
-                  backgroundColor: 'var(--success)', 
-                  color: '#ffffff',
-                  marginBottom: '0.5rem'
-                }}
-              >
-                <Download size={18} />
-                <span>{loading ? 'جاري توليد الشهادة...' : 'تحميل الشهادة الرسمية (PDF)'}</span>
-              </Button>
+                {/* نتائج الكورس الثاني */}
+                {results.filter(r => r.courses?.semester === 'الكورس الثاني').length > 0 && (
+                  <div>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--accent)', marginBottom: '0.5rem' }}>نتائج الكورس الثاني</h4>
+                    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '0.5rem' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: 'var(--bg-secondary)', fontSize: '0.85rem' }}>
+                            <th style={{ padding: '10px', borderBottom: '1px solid var(--border)' }}>المادة</th>
+                            <th style={{ padding: '10px', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>التقدير الكلي</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {results.filter(r => r.courses?.semester === 'الكورس الثاني').map(r => (
+                            <tr key={r.id} style={{ borderBottom: '1px solid var(--border)', fontSize: '0.8rem' }}>
+                              <td style={{ padding: '10px', fontWeight: '500', color: 'var(--text-primary)' }}>{r.courses?.name}</td>
+                              <td style={{ padding: '10px', textAlign: 'left' }}>
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '12px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 'bold',
+                                  ...getBadgeStyle(r.grade_label)
+                                }}>
+                                  {r.grade_label === 'امتياز' ? '🏆 ' + r.grade_label : r.grade_label}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Button 
+                      onClick={() => handleDownloadCertificate('الكورس الثاني')} 
+                      disabled={loading}
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '0.5rem', 
+                        width: '100%', 
+                        backgroundColor: 'var(--success)', 
+                        color: '#ffffff',
+                        marginBottom: '1rem',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      <Download size={16} />
+                      <span>تحميل شهادة الكورس الثاني (PDF)</span>
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
 
             <Button variant="secondary" onClick={resetForm} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%' }}>

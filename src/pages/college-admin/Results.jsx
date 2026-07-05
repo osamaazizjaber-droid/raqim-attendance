@@ -30,6 +30,7 @@ export default function CollegeAdminResults() {
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedStage, setSelectedStage] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
+  const [selectedSemester, setSelectedSemester] = useState('الكورس الأول');
   const [searchQuery, setSearchQuery] = useState('');
   
   // Data States
@@ -65,7 +66,7 @@ export default function CollegeAdminResults() {
     if (adminDetails?.college_id) {
       fetchResults();
     }
-  }, [adminDetails, selectedDept, selectedStage, selectedYear]);
+  }, [adminDetails, selectedDept, selectedStage, selectedYear, selectedSemester]);
 
   const fetchInitialData = async () => {
     try {
@@ -146,7 +147,7 @@ export default function CollegeAdminResults() {
   };
 
   // توليد تلقائي للشهادات بعد الرفع أو التعديل
-  const autoGenerateCertificates = async (studentIds, academicYear, onProgress) => {
+  const autoGenerateCertificates = async (studentIds, academicYear, semester, onProgress) => {
     if (!studentIds || studentIds.length === 0) return;
     try {
       const { data: collegeData } = await supabase
@@ -168,9 +169,10 @@ export default function CollegeAdminResults() {
 
       const { data: allStudentResults } = await supabase
         .from('results')
-        .select('*, courses(name, units)')
+        .select('*, courses!inner(name, units, semester)')
         .in('student_id', studentIds)
-        .eq('academic_year', academicYear);
+        .eq('academic_year', academicYear)
+        .eq('courses.semester', semester);
 
       if (!allStudentResults || allStudentResults.length === 0) return;
 
@@ -178,15 +180,16 @@ export default function CollegeAdminResults() {
       for (const student of studentDetails) {
         const studentResults = allStudentResults.filter(r => r.student_id === student.id);
         if (studentResults.length === 0) {
-          // إذا لم يتبقَ نتائج للطالب، يتم حذف شهادته من قاعدة البيانات والتخزين
+          // إذا لم يتبقَ نتائج للطالب للكورس الحالي، يتم حذف شهادته من قاعدة البيانات والتخزين
           await supabase
             .from('certificates')
             .delete()
             .eq('student_id', student.id)
-            .eq('academic_year', academicYear);
+            .eq('academic_year', academicYear)
+            .eq('semester', semester);
 
           try {
-            const path = `${student.id}/${academicYear.replace('/', '_')}.pdf`;
+            const path = `${student.id}/${academicYear.replace('/', '_')}_${semester.replace(/\s+/g, '_')}.pdf`;
             await supabase.storage.from('certificates').remove([path]);
           } catch (e) {
             console.error('Failed to remove certificate from storage:', e);
@@ -211,9 +214,10 @@ export default function CollegeAdminResults() {
           department: student.departments,
           universityLogoUrl,
           collegeLogoUrl,
+          roundName: semester
         });
 
-        const path = `${student.id}/${academicYear.replace('/', '_')}.pdf`;
+        const path = `${student.id}/${academicYear.replace('/', '_')}_${semester.replace(/\s+/g, '_')}.pdf`;
         const { error: uploadErr } = await supabase.storage
           .from('certificates')
           .upload(path, pdfBlob, {
@@ -233,11 +237,12 @@ export default function CollegeAdminResults() {
           .upsert({
             student_id: student.id,
             academic_year: academicYear,
+            semester: semester,
             overall_grade: overallGrade,
             is_passed: isPassed,
             pdf_url: publicUrl,
             generated_by: user?.id
-          }, { onConflict: 'student_id,academic_year' });
+          }, { onConflict: 'student_id,academic_year,semester' });
 
         current++;
         if (onProgress) onProgress(current, studentDetails.length);
@@ -262,7 +267,7 @@ export default function CollegeAdminResults() {
 
       const { data: allCourses } = await supabase
         .from('courses')
-        .select('id, name, department_id, departments!inner(college_id)')
+        .select('id, name, department_id, semester, departments!inner(college_id)')
         .eq('departments.college_id', adminDetails.college_id);
 
       const studentsMap = new Map(allStudents.map(s => [s.student_number.trim(), s.id]));
@@ -355,14 +360,23 @@ export default function CollegeAdminResults() {
       const uniqueStudentIds = Array.from(new Set(resultsToInsert.map(r => r.student_id)));
       const uploadYear = resultsToInsert[0]?.academic_year || '2024/2025';
 
+
+
+      const affectedSemesters = Array.from(new Set(resultsToInsert.map(r => {
+        const course = allCourses?.find(c => c.id === r.course_id);
+        return course?.semester || 'الكورس الأول';
+      })));
+
       setUploadStatusMsg('جاري توليد ورفع شهادات PDF للطلاب...');
       setUploadProgress({ current: 0, total: uniqueStudentIds.length });
 
-      await autoGenerateCertificates(uniqueStudentIds, uploadYear, (current, total) => {
-        setUploadProgress({ current, total });
-      });
+      for (const sem of affectedSemesters) {
+        await autoGenerateCertificates(uniqueStudentIds, uploadYear, sem, (current, total) => {
+          setUploadProgress({ current, total });
+        });
+      }
 
-      showToast('تم الرفع بنجاح ✅', `تم معالجة وإدخال ${resultsToInsert.length} نتيجة وتوليد ${uniqueStudentIds.length} شهادة PDF بنجاح.`, 'success');
+      showToast('تم الرفع بنجاح ✅', `تم معالجة وإدخال ${resultsToInsert.length} نتيجة وتوليد الشهادات بنجاح.`, 'success');
       setIsUploadModalOpen(false);
       setResultsPreview([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -440,7 +454,11 @@ export default function CollegeAdminResults() {
       // التحديث التلقائي للشهادة الخاصة بالطالب
       const currentResult = results.find(r => r.id === editForm.id);
       if (currentResult) {
-        autoGenerateCertificates([currentResult.student_id], currentResult.academic_year);
+        autoGenerateCertificates(
+          [currentResult.student_id], 
+          currentResult.academic_year, 
+          currentResult.courses?.semester || 'الكورس الأول'
+        );
       }
     } catch (err) {
       showToast('خطأ', 'فشل تحديث الدرجة', 'danger');
@@ -457,7 +475,11 @@ export default function CollegeAdminResults() {
       fetchResults();
 
       if (currentResult) {
-        autoGenerateCertificates([currentResult.student_id], currentResult.academic_year);
+        autoGenerateCertificates(
+          [currentResult.student_id], 
+          currentResult.academic_year, 
+          currentResult.courses?.semester || 'الكورس الأول'
+        );
       }
     } catch (err) {
       showToast('خطأ', 'فشل حذف النتيجة', 'danger');
@@ -495,12 +517,13 @@ export default function CollegeAdminResults() {
           .from('certificates')
           .delete()
           .in('student_id', studentIds)
-          .in('academic_year', academicYears);
+          .in('academic_year', academicYears)
+          .eq('semester', selectedSemester);
 
         // حذف ملفات PDF من التخزين (Supabase Storage)
         const storagePaths = [];
         filteredResults.forEach(r => {
-          const path = `${r.student_id}/${r.academic_year.replace('/', '_')}.pdf`;
+          const path = `${r.student_id}/${r.academic_year.replace('/', '_')}_${selectedSemester.replace(/\s+/g, '_')}.pdf`;
           if (!storagePaths.includes(path)) {
             storagePaths.push(path);
           }
@@ -560,9 +583,10 @@ export default function CollegeAdminResults() {
 
       const { data: resData, error: rErr } = await supabase
         .from('results')
-        .select('*, courses(name, units)')
+        .select('*, courses!inner(name, units, semester)')
         .in('student_id', studentIds)
-        .eq('academic_year', selectedYear);
+        .eq('academic_year', selectedYear)
+        .eq('courses.semester', selectedSemester);
 
       if (rErr) throw rErr;
 
@@ -615,11 +639,12 @@ export default function CollegeAdminResults() {
           academicYear: selectedYear,
           university,
           college,
-          department: deptName
+          department: deptName,
+          roundName: selectedSemester
         });
 
         // 3. ارفع PDF لـ Supabase Storage
-        const path = `${student.id}/${selectedYear.replace('/', '_')}.pdf`;
+        const path = `${student.id}/${selectedYear.replace('/', '_')}_${selectedSemester.replace(/\s+/g, '_')}.pdf`;
         const { error: uploadErr } = await supabase.storage
           .from('certificates')
           .upload(path, pdfBlob, {
@@ -638,11 +663,12 @@ export default function CollegeAdminResults() {
           .upsert({
             student_id: student.id,
             academic_year: selectedYear,
+            semester: selectedSemester,
             overall_grade: overallGrade,
             is_passed: isPassed,
             pdf_url: publicUrl,
             generated_by: user.id
-          }, { onConflict: 'student_id,academic_year' });
+          }, { onConflict: 'student_id,academic_year,semester' });
 
         if (dbErr) throw dbErr;
 
@@ -693,18 +719,19 @@ export default function CollegeAdminResults() {
           academicYear: selectedYear,
           university,
           college,
-          department: deptName
+          department: deptName,
+          roundName: selectedSemester
         });
 
         // إضافة الملف للـ ZIP
-        zip.file(`${student.full_name.replace(/\s+/g, '_')}_${student.student_number.replace(/\//g, '_')}.pdf`, pdfBlob);
+        zip.file(`${student.full_name.replace(/\s+/g, '_')}_${student.student_number.replace(/\//g, '_')}_${selectedSemester.replace(/\s+/g, '_')}.pdf`, pdfBlob);
       }
 
       // توليد وتحميل ملف الـ ZIP
       const content = await zip.generateAsync({ type: 'blob' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(content);
-      link.download = `شهادات_${deptName?.name.replace(/\s+/g, '_')}_${selectedYear.replace('/', '_')}.zip`;
+      link.download = `شهادات_${deptName?.name.replace(/\s+/g, '_')}_${selectedYear.replace('/', '_')}_${selectedSemester.replace(/\s+/g, '_')}.zip`;
       link.click();
 
       showToast('نجاح التحميل 📦', 'تم تحميل وحفظ ملف الـ ZIP بنجاح.', 'success');
@@ -748,12 +775,13 @@ export default function CollegeAdminResults() {
       const deptName = departments.find(d => d.id === selectedDept)?.name || 'قسم_غير_معروف';
       const stageName = stages.find(s => s.id === selectedStage)?.name || 'مرحلة_غير_معروف';
 
-      // 2. جلب المواد الخاصة بالقسم والمرحلة المحددين
+      // 2. جلب المواد الخاصة بالقسم والمرحلة والكورس المحددين
       const { data: coursesData, error: coursesErr } = await supabase
         .from('courses')
         .select('id, name')
         .eq('department_id', selectedDept)
-        .eq('stage_id', selectedStage);
+        .eq('stage_id', selectedStage)
+        .eq('semester', selectedSemester);
 
       if (coursesErr) throw coursesErr;
 
@@ -897,6 +925,13 @@ export default function CollegeAdminResults() {
               {academicYears.map(y => (
                 <option key={y} value={y}>{y}</option>
               ))}
+            </select>
+          </div>
+
+          <div className={compStyles.inputGroup} style={{ margin: 0, minWidth: '120px' }}>
+            <select className={compStyles.input} value={selectedSemester} onChange={e => setSelectedSemester(e.target.value)}>
+              <option value="الكورس الأول">الكورس الأول</option>
+              <option value="الكورس الثاني">الكورس الثاني</option>
             </select>
           </div>
 

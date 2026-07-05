@@ -42,10 +42,15 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'الرقم الجامعي المدخل غير موجود، يرجى التأكد منه.' });
     }
 
-    // جلب نتائج امتحانات الطالب
+    // حجب النتائج لطلاب المسائي غير المسددين للأقساط
+    if (student.study_type === 'مسائي' && student.fees_paid === false) {
+      return res.status(403).json({ error: 'عذراً، تم حجب نتائجك مؤقتاً بسبب عدم تسديد القسط الدراسي. يرجى مراجعة القسم ودفع القسط لتفعيل عرض النتيجة.' });
+    }
+
+    // جلب نتائج امتحانات الطالب مع الكورس التابع للمادة
     const { data: results, error: resErr } = await supabase
       .from('results')
-      .select('*, courses(name, units)')
+      .select('*, courses(name, units, semester)')
       .eq('student_id', student.id)
       .order('created_at', { ascending: true });
 

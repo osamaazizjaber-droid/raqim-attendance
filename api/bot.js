@@ -402,6 +402,12 @@ async function handleViewResults(chatId) {
       return;
     }
 
+    // التحقق من حجب النتائج لطلاب المسائي غير مسددي القسط
+    if (student.study_type === 'مسائي' && student.fees_paid === false) {
+      await bot.sendMessage(chatId, '❌ <b>عذراً، تم حجب نتائجك مؤقتاً بسبب عدم تسديد القسط الدراسي.</b>\n\nيرجى مراجعة القسم ودفع القسط لتفعيل عرض النتيجة.', { parse_mode: 'HTML' });
+      return;
+    }
+
     // جلب درجات الطالب من قاعدة البيانات
     const { data: results, error: resErr } = await supabase
       .from('results')
@@ -442,15 +448,16 @@ async function handleViewResults(chatId) {
     responseText += `✉️ <b>البريد:</b> osamaazizjaber@gmail.com\n`;
     responseText += `📞 <b>هاتف / واتساب:</b> +9647716739456\n`;
 
-    // تجهيز أزرار تحميل الشهادات المتوفرة للتحميل المباشر داخل البوت (فقط للسنوات التي تمتلك نتائج نشطة ولم تُحذف)
+    // تجهيز أزرار تحميل الشهادات المتوفرة للتحميل المباشر داخل البوت
     const inlineButtons = [];
     if (certificates && certificates.length > 0) {
       certificates.forEach(cert => {
         if (cert.pdf_url && results.some(res => res.academic_year === cert.academic_year)) {
+          const semCode = cert.semester === 'الكورس الثاني' ? '2' : '1';
           inlineButtons.push([
             {
-              text: `📥 تحميل شهادة عام ${cert.academic_year} (PDF)`,
-              callback_data: `download_pdf_${cert.academic_year.replace('/', '_')}`
+              text: `📥 تحميل شهادة ${cert.semester || 'الكورس الأول'} لعام ${cert.academic_year} (PDF)`,
+              callback_data: `download_pdf_${cert.academic_year.replace('/', '_')}_${semCode}`
             }
           ]);
         }
@@ -471,10 +478,19 @@ async function handleViewResults(chatId) {
 
 async function handleDownloadPdfCallback(chatId, data) {
   try {
-    const academicYear = data.replace('download_pdf_', '').replace('_', '/');
+    const parts = data.replace('download_pdf_', '').split('_');
+    const academicYear = `${parts[0]}/${parts[1]}`;
+    const semester = parts[2] === '2' ? 'الكورس الثاني' : 'الكورس الأول';
+
     const student = await getStudentByChatId(chatId);
     if (!student) {
       await bot.sendMessage(chatId, '❌ لم يتم ربط حسابك بالبوت بعد.');
+      return;
+    }
+
+    // التحقق من حجب النتائج لطلاب المسائي غير مسددي القسط
+    if (student.study_type === 'مسائي' && student.fees_paid === false) {
+      await bot.sendMessage(chatId, '❌ <b>عذراً، لا يمكنك تحميل الشهادة بسبب عدم تسديد القسط الدراسي.</b>\n\nيرجى مراجعة القسم ودفع القسط لتفعيل عرض النتيجة.', { parse_mode: 'HTML' });
       return;
     }
 
@@ -500,12 +516,13 @@ async function handleDownloadPdfCallback(chatId, data) {
       .select('*')
       .eq('student_id', student.id)
       .eq('academic_year', academicYear)
+      .eq('semester', semester)
       .maybeSingle();
 
     if (error) throw error;
 
     if (!cert || !cert.pdf_url) {
-      await bot.sendMessage(chatId, `⚠️ لم يتم إصدار شهادة PDF للعام الدراسي ${academicYear} بعد من قبل إدارة الكلية.`);
+      await bot.sendMessage(chatId, `⚠️ لم يتم إصدار شهادة PDF للعام الدراسي ${academicYear} - ${semester} بعد من قبل إدارة الكلية.`);
       return;
     }
 
@@ -516,11 +533,11 @@ async function handleDownloadPdfCallback(chatId, data) {
     }
     const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
 
-    const fileName = `شهادة_${student.full_name?.replace(/\s+/g, '_') || 'الطالب'}_${cert.academic_year.replace('/', '-')}.pdf`;
+    const fileName = `شهادة_${student.full_name?.replace(/\s+/g, '_') || 'الطالب'}_${cert.academic_year.replace('/', '-')}_${semester.replace(/\s+/g, '_')}.pdf`;
 
     // إرسال ملف الـ PDF مباشرة داخل المحادثة كـ Buffer لضمان عدم تقديم نسخة قديمة مخزنة مؤقتاً
     await bot.sendDocument(chatId, pdfBuffer, {
-      caption: `📄 <b>الشهادة الأكاديمية الرسمية للعام الدراسي: ${cert.academic_year}</b>\n• التقدير العام: <b>${cert.overall_grade}</b>\n• الحالة: <b>${cert.is_passed ? 'ناجح 🎉' : 'راسب ❌'}</b>`,
+      caption: `📄 <b>الشهادة الأكاديمية الرسمية - ${semester}\nالعام الدراسي: ${cert.academic_year}</b>\n• التقدير العام: <b>${cert.overall_grade}</b>\n• الحالة: <b>${cert.is_passed ? 'ناجح 🎉' : 'راسب ❌'}</b>`,
       parse_mode: 'HTML'
     }, {
       filename: fileName,

@@ -107,7 +107,7 @@ export const generateCertificatePDF = async ({
   department,
   universityLogoUrl = null,
   collegeLogoUrl = null,
-  roundName = 'الاول',
+  roundName = 'الكورس الأول',
 }) => {
   // Pre-load logo image (university logo preferred, college logo as fallback)
   const logoUrl = universityLogoUrl || collegeLogoUrl;
@@ -210,7 +210,7 @@ export const generateCertificatePDF = async ({
   const studyTypeText = student.study_type === 'مسائي' ? 'المسائية' : 'الصباحية';
   ctx.fillText(`المرحلة: ${stageName}`, 100, startY + 50);
   ctx.fillText(`الدراسة: ${studyTypeText}`, 100, startY + 95);
-  ctx.fillText(`الدور: ${roundName}`, 100, startY + 140);
+  ctx.fillText(`الكورس: ${roundName}`, 100, startY + 140);
 
   // ─────────────────────────────────────────
   // 6. TITLE

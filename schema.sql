@@ -79,6 +79,7 @@ CREATE TABLE courses (
     department_id uuid REFERENCES departments(id) ON DELETE CASCADE,
     stage_id uuid REFERENCES stages(id) ON DELETE CASCADE,
     units numeric DEFAULT 1,
+    semester text DEFAULT 'الكورس الأول' CHECK (semester IN ('الكورس الأول', 'الكورس الثاني')),
     created_at timestamptz DEFAULT now()
 );
 
@@ -127,6 +128,7 @@ CREATE TABLE students (
     telegram_chat_id bigint,
     telegram_file_id text,
     study_type text DEFAULT 'صباحي' CHECK (study_type IN ('صباحي', 'مسائي')),
+    fees_paid boolean DEFAULT true,
     created_at timestamptz DEFAULT now()
 );
 
@@ -207,12 +209,13 @@ CREATE TABLE certificates (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id uuid REFERENCES students(id) ON DELETE CASCADE,
     academic_year text NOT NULL,
+    semester text DEFAULT 'الكورس الأول' CHECK (semester IN ('الكورس الأول', 'الكورس الثاني')),
     overall_grade text NOT NULL,
     is_passed boolean NOT NULL,
     pdf_url text,
     generated_at timestamptz DEFAULT now(),
     generated_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-    UNIQUE(student_id, academic_year)
+    UNIQUE(student_id, academic_year, semester)
 );
 
 -- 17. طابور طلبات إعادة الإرسال عبر البوت
