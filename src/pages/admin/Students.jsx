@@ -333,19 +333,31 @@ export default function AdminStudents() {
 
       if (insertErr) throw insertErr;
 
-      // هـ. توليد ورفع صور الـ QR على خادم سوبابيس على دفعات متوازية (Parallel Chunks)
-      const batchSize = 6; // معالجة 6 طلاب متوازيين بكل دفعة لسرعة الاستجابة ومنع تجميد المتصفح
-      for (let i = 0; i < studentsToInsert.length; i += batchSize) {
-        const batch = studentsToInsert.slice(i, i + batchSize);
-        await Promise.all(batch.map(async (student) => {
+      // هـ. توليد ورفع صور الـ QR على خادم سوبابيس مع مجموعة عمال متوازية (concurrency: 12) لسرعة استثنائية
+      const concurrency = 12;
+      let currentIndex = 0;
+      let completedCount = 0;
+
+      const worker = async () => {
+        while (currentIndex < studentsToInsert.length) {
+          const student = studentsToInsert[currentIndex++];
+          if (!student) break;
           try {
             await generateAndUploadQRCard(student, univName);
           } catch (qrErr) {
             console.error(`فشل رفع كود QR للطالب ${student.full_name}:`, qrErr);
+          } finally {
+            completedCount++;
+            setImportProgress({ current: completedCount, total: studentsToInsert.length });
           }
-        }));
-        setImportProgress({ current: Math.min(i + batchSize, studentsToInsert.length), total: studentsToInsert.length });
+        }
+      };
+
+      const workers = [];
+      for (let w = 0; w < Math.min(concurrency, studentsToInsert.length); w++) {
+        workers.push(worker());
       }
+      await Promise.all(workers);
 
       showToast('نجاح الاستيراد', `تم استيراد ${studentsToInsert.length} طالب جديد وتوليد بطاقات الـ QR الخاصة بهم بنجاح وسرعة فائقة.`, 'success');
       setIsImportModalOpen(false);

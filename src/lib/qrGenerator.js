@@ -8,7 +8,7 @@ import { supabase } from './supabase';
  * @returns {Promise<string>} رابط الصورة المرفوعة
  */
 export async function generateAndUploadQRCard(student, universityName = 'جامعة رقيم') {
-  const scale = 3; // معامل تكبير الدقة 3x لبطاقة فائقة الوضوح والحدة (Retina Resolution)
+  const scale = 2; // معامل تكبير الدقة 2x لبطاقة واضحة وحجم مناسب (Retina Resolution)
   const baseWidth = 400;
   const baseHeight = 580;
   

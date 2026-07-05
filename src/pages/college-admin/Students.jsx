@@ -334,19 +334,31 @@ export default function CollegeAdminStudents() {
 
       if (insertErr) throw insertErr;
 
-      // Parallel chunk generation for QR cards
-      const batchSize = 6;
-      for (let i = 0; i < studentsToInsert.length; i += batchSize) {
-        const batch = studentsToInsert.slice(i, i + batchSize);
-        await Promise.all(batch.map(async (student) => {
+      // Parallel generation and upload with worker pool (concurrency: 12)
+      const concurrency = 12;
+      let currentIndex = 0;
+      let completedCount = 0;
+
+      const worker = async () => {
+        while (currentIndex < studentsToInsert.length) {
+          const student = studentsToInsert[currentIndex++];
+          if (!student) break;
           try {
             await generateAndUploadQRCard(student, univName);
           } catch (qrErr) {
             console.error(`فشل رفع كود QR للطالب ${student.full_name}:`, qrErr);
+          } finally {
+            completedCount++;
+            setImportProgress({ current: completedCount, total: studentsToInsert.length });
           }
-        }));
-        setImportProgress({ current: Math.min(i + batchSize, studentsToInsert.length), total: studentsToInsert.length });
+        }
+      };
+
+      const workers = [];
+      for (let w = 0; w < Math.min(concurrency, studentsToInsert.length); w++) {
+        workers.push(worker());
       }
+      await Promise.all(workers);
 
       showToast('نجاح الاستيراد', `تم استيراد ${studentsToInsert.length} طالب جديد وتوليد بطاقات الـ QR بنجاح.`, 'success');
       setIsImportModalOpen(false);
