@@ -408,6 +408,12 @@ async function handleViewResults(chatId) {
       return;
     }
 
+    // التحقق من حجب النتائج لعدم التسجيل في منصة HEPIC
+    if (student.hepic_registered === false) {
+      await bot.sendMessage(chatId, '❌ <b>عذراً، تم حجب نتائجك بسبب عدم التسجيل في منصة HEPIC.</b>\n\nيرجى مراجعة القسم لإكمال التسجيل وتفعيل عرض النتيجة.', { parse_mode: 'HTML' });
+      return;
+    }
+
     // جلب درجات الطالب من قاعدة البيانات
     const { data: results, error: resErr } = await supabase
       .from('results')
@@ -491,6 +497,12 @@ async function handleDownloadPdfCallback(chatId, data) {
     // التحقق من حجب النتائج لطلاب المسائي غير مسددي القسط
     if (student.study_type === 'مسائي' && student.fees_paid === false) {
       await bot.sendMessage(chatId, '❌ <b>عذراً، لا يمكنك تحميل الشهادة بسبب عدم تسديد القسط الدراسي.</b>\n\nيرجى مراجعة القسم ودفع القسط لتفعيل عرض النتيجة.', { parse_mode: 'HTML' });
+      return;
+    }
+
+    // التحقق من حجب النتائج لعدم التسجيل في منصة HEPIC
+    if (student.hepic_registered === false) {
+      await bot.sendMessage(chatId, '❌ <b>عذراً، لا يمكنك تحميل الشهادة بسبب عدم التسجيل في منصة HEPIC.</b>\n\nيرجى مراجعة القسم لإكمال التسجيل وتفعيل عرض النتيجة.', { parse_mode: 'HTML' });
       return;
     }
 

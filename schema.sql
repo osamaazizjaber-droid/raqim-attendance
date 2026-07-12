@@ -129,6 +129,7 @@ CREATE TABLE students (
     telegram_file_id text,
     study_type text DEFAULT 'صباحي' CHECK (study_type IN ('صباحي', 'مسائي')),
     fees_paid boolean DEFAULT true,
+    hepic_registered boolean DEFAULT true,
     created_at timestamptz DEFAULT now()
 );
 

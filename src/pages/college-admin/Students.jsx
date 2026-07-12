@@ -497,6 +497,29 @@ export default function CollegeAdminStudents() {
     }
   };
 
+  // Toggle HEPIC Registration Status
+  const handleToggleHepicRegistered = async (student) => {
+    try {
+      const newStatus = student.hepic_registered !== false ? false : true;
+      const { error } = await supabase
+        .from('students')
+        .update({ hepic_registered: newStatus })
+        .eq('id', student.id);
+
+      if (error) throw error;
+
+      showToast(
+        'تم التحديث ✅', 
+        `تم تحديث حالة منصة HEPIC للطالب "${student.full_name}" بنجاح.`, 
+        'success'
+      );
+      
+      setStudents(prev => prev.map(s => s.id === student.id ? { ...s, hepic_registered: newStatus } : s));
+    } catch (err) {
+      showToast('خطأ', err.message || 'فشل تحديث حالة منصة HEPIC', 'danger');
+    }
+  };
+
   // Manage student courses (such as repeat courses)
   const openStudentCourses = async (student) => {
     setActiveStudent(student);
@@ -705,6 +728,7 @@ export default function CollegeAdminStudents() {
                   <Th>الدراسة</Th>
                   <Th>التيليجرام</Th>
                   <Th>القسط (للمسائي)</Th>
+                  <Th>منصة HEPIC</Th>
                   <Th>العمليات</Th>
                 </Tr>
               </thead>
@@ -749,6 +773,24 @@ export default function CollegeAdminStudents() {
                       ) : (
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>صباحي (معفى)</span>
                       )}
+                    </Td>
+                    <Td style={{ minWidth: '130px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        {student.hepic_registered !== false ? (
+                          <Badge variant="success">مسجل ✅</Badge>
+                        ) : (
+                          <Badge variant="danger">محجوب ❌</Badge>
+                        )}
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          onClick={() => handleToggleHepicRegistered(student)}
+                          style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem', height: 'auto' }}
+                          title="تعديل حالة التسجيل في منصة HEPIC وتفعيل عرض النتيجة"
+                        >
+                          تغيير
+                        </Button>
+                      </div>
                     </Td>
                     <Td>
                       <div style={{ display: 'flex', gap: '0.4rem' }}>

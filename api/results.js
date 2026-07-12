@@ -47,6 +47,11 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'عذراً، تم حجب نتائجك مؤقتاً بسبب عدم تسديد القسط الدراسي. يرجى مراجعة القسم ودفع القسط لتفعيل عرض النتيجة.' });
     }
 
+    // حجب نتائج الطلاب غير المسجلين في منصة HEPIC
+    if (student.hepic_registered === false) {
+      return res.status(403).json({ error: 'عذراً، تم حجب نتائجك بسبب عدم التسجيل في منصة HEPIC. يرجى مراجعة القسم لإكمال التسجيل وتفعيل عرض النتيجة.' });
+    }
+
     // جلب نتائج امتحانات الطالب مع الكورس التابع للمادة
     const { data: results, error: resErr } = await supabase
       .from('results')
