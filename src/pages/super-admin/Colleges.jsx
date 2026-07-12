@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Key, Building, Calendar, Users, ShieldAlert } from 'lucide-react';
+import { Plus, Trash2, Key, Building, Calendar, Users, ShieldAlert, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../components/ui/Toast';
 import { Button } from '../../components/ui/Button';
@@ -140,6 +140,37 @@ export default function SuperAdminColleges() {
       fetchColleges();
     } catch (err) {
       showToast('خطأ', err.message || 'فشل حذف الكلية', 'danger');
+    }
+  };
+
+  const handleLogoUpload = async (file, type) => {
+    if (!file) return;
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const path = `logos/${fileName}`;
+      
+      const { error: uploadErr } = await supabase.storage
+        .from('qr-cards')
+        .upload(path, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+        
+      if (uploadErr) throw uploadErr;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('qr-cards')
+        .getPublicUrl(path);
+        
+      if (type === 'college') {
+        setCollegeForm(prev => ({ ...prev, logo_url: publicUrl }));
+      } else {
+        setCollegeForm(prev => ({ ...prev, university_logo_url: publicUrl }));
+      }
+      showToast('تم الرفع ✅', 'تم رفع شعار الكلية بنجاح.', 'success');
+    } catch (err) {
+      showToast('خطأ في الرفع', err.message || 'فشل رفع ملف الصورة.', 'danger');
     }
   };
 
@@ -368,27 +399,55 @@ export default function SuperAdminColleges() {
               />
             </div>
             <div className={compStyles.inputGroup}>
-              <label className={compStyles.label}>🎓 رابط شعار الجامعة (University Logo URL)</label>
-              <input 
-                type="url" 
-                className={compStyles.input}
-                value={collegeForm.university_logo_url}
-                onChange={e => setCollegeForm({ ...collegeForm, university_logo_url: e.target.value })}
-                placeholder="https://example.com/university-logo.jpg or .png"
-              />
+              <label className={compStyles.label}>🎓 شعار الجامعة (University Logo)</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input 
+                  type="url" 
+                  className={compStyles.input}
+                  value={collegeForm.university_logo_url}
+                  onChange={e => setCollegeForm({ ...collegeForm, university_logo_url: e.target.value })}
+                  placeholder="رابط شعار الجامعة أو ارفع ملفاً"
+                  style={{ flex: 1 }}
+                />
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  id="univ-logo-file"
+                  onChange={e => handleLogoUpload(e.target.files[0], 'university')}
+                />
+                <Button type="button" variant="secondary" onClick={() => document.getElementById('univ-logo-file').click()}>
+                  <Upload size={16} />
+                  <span>رفع</span>
+                </Button>
+              </div>
               {collegeForm.university_logo_url && (
                 <img src={collegeForm.university_logo_url} alt="university logo preview" style={{ height: '60px', marginTop: '8px', borderRadius: '8px', objectFit: 'contain', border: '1px solid var(--border)' }} onError={e => e.target.style.display='none'} />
               )}
             </div>
             <div className={compStyles.inputGroup}>
-              <label className={compStyles.label}>🏛 رابط شعار الكلية (College Logo URL)</label>
-              <input 
-                type="url" 
-                className={compStyles.input}
-                value={collegeForm.logo_url}
-                onChange={e => setCollegeForm({ ...collegeForm, logo_url: e.target.value })}
-                placeholder="https://example.com/college-logo.jpg or .png"
-              />
+              <label className={compStyles.label}>🏛 شعار الكلية (College Logo)</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input 
+                  type="url" 
+                  className={compStyles.input}
+                  value={collegeForm.logo_url}
+                  onChange={e => setCollegeForm({ ...collegeForm, logo_url: e.target.value })}
+                  placeholder="رابط شعار الكلية أو ارفع ملفاً"
+                  style={{ flex: 1 }}
+                />
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  id="college-logo-file"
+                  onChange={e => handleLogoUpload(e.target.files[0], 'college')}
+                />
+                <Button type="button" variant="secondary" onClick={() => document.getElementById('college-logo-file').click()}>
+                  <Upload size={16} />
+                  <span>رفع</span>
+                </Button>
+              </div>
               {collegeForm.logo_url && (
                 <img src={collegeForm.logo_url} alt="college logo preview" style={{ height: '60px', marginTop: '8px', borderRadius: '8px', objectFit: 'contain', border: '1px solid var(--border)' }} onError={e => e.target.style.display='none'} />
               )}
