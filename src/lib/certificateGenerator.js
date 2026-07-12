@@ -10,7 +10,8 @@ const loadImage = (url) => new Promise((resolve) => {
   img.crossOrigin = 'anonymous';
   img.onload = () => resolve(img);
   img.onerror = () => resolve(null);
-  img.src = url;
+  const cacheBuster = url.includes('?') ? `&_t=${Date.now()}` : `?_t=${Date.now()}`;
+  img.src = url + cacheBuster;
 });
 
 /**
