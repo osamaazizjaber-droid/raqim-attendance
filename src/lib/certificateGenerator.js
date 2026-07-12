@@ -194,7 +194,9 @@ export const generateCertificatePDF = async ({
   ctx.font = 'bold 24px Tajawal, Arial, sans-serif';
   ctx.fillText('وزارة التعليم العالي والبحث العلمي', W - 100, startY + 50);
   ctx.fillText(college?.name || university?.name || college?.university || 'كلية السلام الجامعة', W - 100, startY + 95);
-  ctx.fillText(`قسم ${department?.name || '-'}`, W - 100, startY + 140);
+  const deptName = (department?.name || '-').trim();
+  const displayDept = deptName.startsWith('قسم') ? deptName : `قسم ${deptName}`;
+  ctx.fillText(displayDept, W - 100, startY + 140);
 
   // C. Left Aligned Text
   ctx.textAlign = 'left';
@@ -210,7 +212,9 @@ export const generateCertificatePDF = async ({
   const studyTypeText = student.study_type === 'مسائي' ? 'المسائية' : 'الصباحية';
   ctx.fillText(`المرحلة: ${stageName}`, 100, startY + 50);
   ctx.fillText(`الدراسة: ${studyTypeText}`, 100, startY + 95);
-  ctx.fillText(`الكورس: ${roundName}`, 100, startY + 140);
+  
+  const displayRound = roundName.replace('الكورس ', '').replace('الدور ', '');
+  ctx.fillText(`الكورس: ${displayRound}`, 100, startY + 140);
 
   // ─────────────────────────────────────────
   // 6. TITLE
