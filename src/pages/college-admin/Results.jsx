@@ -51,7 +51,7 @@ export default function CollegeAdminResults() {
   const [genProgress, setGenProgress] = useState({ current: 0, total: 0 });
 
   // Edit / Form states
-  const [editForm, setEditForm] = useState({ id: null, score: '', grade_label: '', student_name: '', course_name: '' });
+  const [editForm, setEditForm] = useState({ studentId: null, studentName: '', academicYear: '', semester: '', coursesList: [] });
 
   // Academic years list helper
   const academicYears = ['2023/2024', '2024/2025', '2025/2026', '2026/2027'];
@@ -392,10 +392,25 @@ export default function CollegeAdminResults() {
     }
   };
 
-  const handleGradeSelectChange = (e) => {
-    const label = e.target.value;
+  const handleModalScoreChange = (index, scoreVal) => {
+    const updated = [...editForm.coursesList];
+    const scoreNum = parseFloat(scoreVal);
+    let label = updated[index].grade_label;
+    if (!isNaN(scoreNum)) {
+      const scale = gradeScales.find(s => scoreNum >= s.min_score && scoreNum <= s.max_score);
+      if (scale) label = scale.label;
+    }
+    updated[index].score = scoreVal;
+    updated[index].grade_label = label;
+    setEditForm(prev => ({
+      ...prev,
+      coursesList: updated
+    }));
+  };
+
+  const handleModalGradeChange = (index, label) => {
     if (!label) return;
-    
+    const updated = [...editForm.coursesList];
     const defaultScores = {
       'امتياز': 95,
       'جيد جداً': 85,
@@ -404,35 +419,29 @@ export default function CollegeAdminResults() {
       'مقبول': 55,
       'ضعيف': 45
     };
+    updated[index].grade_label = label;
+    updated[index].score = defaultScores[label] || updated[index].score;
     setEditForm(prev => ({
       ...prev,
-      grade_label: label,
-      score: defaultScores[label] || prev.score
+      coursesList: updated
     }));
   };
 
-  const handleScoreChange = (e) => {
-    const scoreVal = e.target.value;
-    const scoreNum = parseFloat(scoreVal);
-    let label = editForm.grade_label;
-    if (!isNaN(scoreNum)) {
-      const scale = gradeScales.find(s => scoreNum >= s.min_score && scoreNum <= s.max_score);
-      if (scale) label = scale.label;
-    }
-    setEditForm(prev => ({
-      ...prev,
-      score: scoreVal,
-      grade_label: label
-    }));
-  };
-
-  const handleEditResult = (res) => {
-    setEditForm({
-      id: res.id,
+  const handleEditResult = (studentRow) => {
+    const coursesList = Array.from(studentRow.results.entries()).map(([courseName, res]) => ({
+      resultId: res.id,
+      courseId: res.course_id,
+      courseName: courseName,
       score: res.score,
-      grade_label: res.grade_label,
-      student_name: res.students?.full_name,
-      course_name: res.courses?.name
+      grade_label: res.grade_label
+    }));
+
+    setEditForm({
+      studentId: studentRow.student.id,
+      studentName: studentRow.student.full_name,
+      academicYear: studentRow.academic_year,
+      semester: studentRow.results.values().next().value?.courses?.semester || selectedSemester,
+      coursesList: coursesList
     });
     setIsEditModalOpen(true);
   };
@@ -440,52 +449,68 @@ export default function CollegeAdminResults() {
   const saveEditedResult = async (e) => {
     e.preventDefault();
     try {
-      const score = parseFloat(editForm.score);
-      const scale = gradeScales.find(s => score >= s.min_score && score <= s.max_score);
-      const label = scale ? scale.label : editForm.grade_label;
+      const promises = editForm.coursesList.map(item => {
+        const score = parseFloat(item.score);
+        const scale = gradeScales.find(s => score >= s.min_score && score <= s.max_score);
+        const label = scale ? scale.label : item.grade_label;
 
-      const { error } = await supabase
-        .from('results')
-        .update({ score: score, grade_label: label })
-        .eq('id', editForm.id);
+        return supabase
+          .from('results')
+          .update({ score: score, grade_label: label })
+          .eq('id', item.resultId);
+      });
 
-      if (error) throw error;
+      const resultsRes = await Promise.all(promises);
+      const errors = resultsRes.filter(r => r.error);
+      if (errors.length > 0) throw errors[0].error;
+
       showToast('تم التحديث', 'تم حفظ التعديلات بنجاح وجاري تحديث الشهادة تلقائياً.', 'success');
       setIsEditModalOpen(false);
       fetchResults();
 
       // التحديث التلقائي للشهادة الخاصة بالطالب
-      const currentResult = results.find(r => r.id === editForm.id);
-      if (currentResult) {
-        autoGenerateCertificates(
-          [currentResult.student_id], 
-          currentResult.academic_year, 
-          currentResult.courses?.semester || 'الكورس الأول'
-        );
-      }
+      autoGenerateCertificates(
+        [editForm.studentId], 
+        editForm.academicYear, 
+        editForm.semester
+      );
     } catch (err) {
-      showToast('خطأ', 'فشل تحديث الدرجة', 'danger');
+      showToast('خطأ', 'فشل تحديث الدرجات', 'danger');
     }
   };
 
-  const handleDeleteResult = async (resId) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذه النتيجة نهائياً؟')) return;
+  const handleDeleteStudentResults = async (studentId, studentName, studentResultsList) => {
+    if (!window.confirm(`هل أنت متأكد من حذف جميع درجات الطالب "${studentName}" لهذا الفصل الدراسي نهائياً؟`)) return;
     try {
-      const currentResult = results.find(r => r.id === resId);
-      const { error } = await supabase.from('results').delete().eq('id', resId);
+      const resultIds = studentResultsList.map(r => r.id);
+      const { error } = await supabase.from('results').delete().in('id', resultIds);
       if (error) throw error;
-      showToast('نجاح الحذف', 'تم مسح النتيجة بنجاح وجاري تحديث الشهادة.', 'success');
+      showToast('نجاح الحذف', 'تم مسح درجات الطالب بنجاح وجاري تحديث الشهادة.', 'success');
       fetchResults();
 
-      if (currentResult) {
-        autoGenerateCertificates(
-          [currentResult.student_id], 
-          currentResult.academic_year, 
-          currentResult.courses?.semester || 'الكورس الأول'
-        );
+      if (studentResultsList.length > 0) {
+        const firstRes = studentResultsList[0];
+        // Delete their certificate from DB
+        await supabase
+          .from('certificates')
+          .delete()
+          .eq('student_id', studentId)
+          .eq('academic_year', firstRes.academic_year)
+          .eq('semester', firstRes.courses?.semester || selectedSemester);
+
+        // Delete from Storage
+        const semCode = (firstRes.courses?.semester || selectedSemester) === 'الكورس الثاني' ? 'sem2' : 'sem1';
+        const path = `${studentId}/${firstRes.academic_year.replace('/', '_')}_${semCode}.pdf`;
+        try {
+          await supabase.storage
+            .from('certificates')
+            .remove([path]);
+        } catch (storageErr) {
+          console.error('Failed to remove certificate from storage:', storageErr);
+        }
       }
     } catch (err) {
-      showToast('خطأ', 'فشل حذف النتيجة', 'danger');
+      showToast('خطأ', 'فشل حذف درجات الطالب', 'danger');
     }
   };
 
@@ -898,6 +923,27 @@ export default function CollegeAdminResults() {
     );
   });
 
+  // Grouping results by student for Matrix rendering
+  const uniqueCourses = Array.from(new Set(filteredResults.map(r => r.courses?.name))).filter(Boolean).sort();
+  
+  const groupedStudentsMap = new Map();
+  filteredResults.forEach(r => {
+    if (!r.students) return;
+    const studentId = r.student_id;
+    if (!groupedStudentsMap.has(studentId)) {
+      groupedStudentsMap.set(studentId, {
+        student: r.students,
+        academic_year: r.academic_year,
+        results: new Map() // courseName -> result record
+      });
+    }
+    if (r.courses?.name) {
+      groupedStudentsMap.get(studentId).results.set(r.courses.name, r);
+    }
+  });
+  
+  const studentRows = Array.from(groupedStudentsMap.values());
+
   const getBadgeColor = (grade) => {
     const colors = {
       'امتياز': '#C9A84C', // Gold
@@ -995,46 +1041,61 @@ export default function CollegeAdminResults() {
                 <Tr>
                   <Th>اسم الطالب</Th>
                   <Th>الرقم الجامعي</Th>
-                  <Th>المادة</Th>
                   <Th>السنة الدراسية</Th>
-                  <Th>الدرجة الرقمية</Th>
-                  <Th>التقدير</Th>
+                  {uniqueCourses.map(courseName => (
+                    <Th key={courseName}>{courseName}</Th>
+                  ))}
                   <Th>العمليات</Th>
                 </Tr>
               </thead>
               <tbody>
-                {filteredResults.map(res => (
-                  <Tr key={res.id}>
-                    <Td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{res.students?.full_name}</Td>
-                    <Td style={{ fontFamily: 'monospace' }}>{res.students?.student_number}</Td>
-                    <Td style={{ fontWeight: '500' }}>{res.courses?.name}</Td>
-                    <Td>{res.academic_year}</Td>
-                    <Td style={{ fontWeight: 'bold' }}>{res.score}</Td>
-                    <Td>
-                      <span style={{ 
-                        display: 'inline-block',
-                        padding: '0.25rem 0.6rem',
-                        borderRadius: '12px',
-                        fontSize: '0.8rem',
-                        fontWeight: 'bold',
-                        color: '#ffffff',
-                        backgroundColor: getBadgeColor(res.grade_label)
-                      }}>
-                        {res.grade_label}
-                      </span>
-                    </Td>
-                    <Td>
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        <Button size="icon" variant="secondary" onClick={() => handleEditResult(res)}>
-                          <Edit size={14} />
-                        </Button>
-                        <Button size="icon" variant="danger" onClick={() => handleDeleteResult(res.id)}>
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
-                    </Td>
-                  </Tr>
-                ))}
+                {studentRows.map(row => {
+                  const studentResultsList = Array.from(row.results.values());
+                  return (
+                    <Tr key={row.student.id}>
+                      <Td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{row.student.full_name}</Td>
+                      <Td style={{ fontFamily: 'monospace' }}>{row.student.student_number}</Td>
+                      <Td>{row.academic_year}</Td>
+                      {uniqueCourses.map(courseName => {
+                        const res = row.results.get(courseName);
+                        return (
+                          <Td key={courseName}>
+                            {res ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                <span style={{ fontWeight: 'bold' }}>{res.score}</span>
+                                <span style={{ 
+                                  display: 'inline-block',
+                                  padding: '0.1rem 0.4rem',
+                                  borderRadius: '8px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 'bold',
+                                  color: '#ffffff',
+                                  backgroundColor: getBadgeColor(res.grade_label),
+                                  textAlign: 'center',
+                                  width: 'fit-content'
+                                }}>
+                                  {res.grade_label}
+                                </span>
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)' }}>-</span>
+                            )}
+                          </Td>
+                        );
+                      })}
+                      <Td>
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <Button size="icon" variant="secondary" onClick={() => handleEditResult(row)}>
+                            <Edit size={14} />
+                          </Button>
+                          <Button size="icon" variant="danger" onClick={() => handleDeleteStudentResults(row.student.id, row.student.full_name, studentResultsList)}>
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </Td>
+                    </Tr>
+                  );
+                })}
               </tbody>
             </Table>
           </div>
@@ -1125,66 +1186,73 @@ export default function CollegeAdminResults() {
           </div>
         </Modal>
 
-        {/* مودال تعديل النتيجة الفردية */}
-        <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="تعديل درجة وتقدير الطالب">
+        {/* مودال تعديل النتائج للفصل الدراسي */}
+        <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="تعديل درجات وتقديرات الطالب للفصل الحالي">
           <form onSubmit={saveEditedResult} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             
-            {/* معلومات الطالب والمادة */}
+            {/* اسم الطالب */}
             <div style={{ 
               backgroundColor: 'var(--bg-secondary)', 
               padding: '1rem', 
               borderRadius: 'var(--radius-md)', 
               border: '1px solid var(--border)', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '0.5rem' 
+              marginBottom: '0.5rem'
             }}>
               <div>
                 <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>اسم الطالب: </span>
-                <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>{editForm.student_name}</strong>
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>المادة الدراسية: </span>
-                <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>{editForm.course_name}</strong>
+                <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>{editForm.studentName}</strong>
               </div>
             </div>
 
-            {/* تحديد التقدير مباشرة */}
-            <div className={compStyles.inputGroup}>
-              <label className={compStyles.label}>التقدير العام</label>
-              <select 
-                className={compStyles.input}
-                value={editForm.grade_label}
-                onChange={handleGradeSelectChange}
-                required
-              >
-                <option value="">اختر التقدير...</option>
-                <option value="امتياز">امتياز (90 - 100)</option>
-                <option value="جيد جداً">جيد جداً (80 - 89)</option>
-                <option value="جيد">جيد (70 - 79)</option>
-                <option value="متوسط">متوسط (60 - 69)</option>
-                <option value="مقبول">مقبول (50 - 59)</option>
-                <option value="ضعيف">ضعيف (0 - 49)</option>
-              </select>
-            </div>
+            {/* قائمة المواد وتعديل درجاتها */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '350px', overflowY: 'auto', paddingLeft: '0.5rem' }}>
+              {editForm.coursesList.map((item, index) => (
+                <div key={item.resultId} style={{ 
+                  border: '1px solid var(--border)', 
+                  borderRadius: 'var(--radius-md)', 
+                  padding: '0.85rem',
+                  backgroundColor: 'rgba(255, 255, 255, 0.02)'
+                }}>
+                  <h4 style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '0.75rem', color: 'var(--text-primary)' }}>
+                    📚 {item.courseName}
+                  </h4>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    {/* تحديد التقدير */}
+                    <div className={compStyles.inputGroup} style={{ flex: 1, minWidth: '150px', margin: 0 }}>
+                      <label className={compStyles.label} style={{ fontSize: '0.75rem' }}>التقدير</label>
+                      <select 
+                        className={compStyles.input}
+                        value={item.grade_label}
+                        onChange={e => handleModalGradeChange(index, e.target.value)}
+                        required
+                      >
+                        <option value="">اختر...</option>
+                        <option value="امتياز">امتياز (90 - 100)</option>
+                        <option value="جيد جداً">جيد جداً (80 - 89)</option>
+                        <option value="جيد">جيد (70 - 79)</option>
+                        <option value="متوسط">متوسط (60 - 69)</option>
+                        <option value="مقبول">مقبول (50 - 59)</option>
+                        <option value="ضعيف">ضعيف (0 - 49)</option>
+                      </select>
+                    </div>
 
-            {/* الدرجة الرقمية (تتحدث تلقائياً) */}
-            <div className={compStyles.inputGroup}>
-              <label className={compStyles.label}>الدرجة الرقمية (من 0 إلى 100)</label>
-              <input 
-                type="number" 
-                step="0.1"
-                min="0"
-                max="100"
-                required
-                className={compStyles.input}
-                value={editForm.score}
-                onChange={handleScoreChange}
-                placeholder="سيتم تعيين درجة تلقائية عند اختيار التقدير"
-              />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                * يمكنك إدخال درجة مخصصة أو الاعتماد على الدرجة التلقائية للتقدير المختار.
-              </span>
+                    {/* الدرجة الرقمية */}
+                    <div className={compStyles.inputGroup} style={{ flex: 1, minWidth: '150px', margin: 0 }}>
+                      <label className={compStyles.label} style={{ fontSize: '0.75rem' }}>الدرجة الرقمية (من 0 إلى 100)</label>
+                      <input 
+                        type="number" 
+                        step="0.1"
+                        min="0"
+                        max="100"
+                        required
+                        className={compStyles.input}
+                        value={item.score}
+                        onChange={e => handleModalScoreChange(index, e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
