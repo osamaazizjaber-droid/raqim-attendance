@@ -217,7 +217,8 @@ export default function CollegeAdminResults() {
           roundName: semester
         });
 
-        const path = `${student.id}/${academicYear.replace('/', '_')}_${semester.replace(/\s+/g, '_')}.pdf`;
+        const semCode = semester === 'الكورس الثاني' ? 'sem2' : 'sem1';
+        const path = `${student.id}/${academicYear.replace('/', '_')}_${semCode}.pdf`;
         const { error: uploadErr } = await supabase.storage
           .from('certificates')
           .upload(path, pdfBlob, {
@@ -645,7 +646,8 @@ export default function CollegeAdminResults() {
         });
 
         // 3. ارفع PDF لـ Supabase Storage
-        const path = `${student.id}/${selectedYear.replace('/', '_')}_${selectedSemester.replace(/\s+/g, '_')}.pdf`;
+        const semCode = selectedSemester === 'الكورس الثاني' ? 'sem2' : 'sem1';
+        const path = `${student.id}/${selectedYear.replace('/', '_')}_${semCode}.pdf`;
         const { error: uploadErr } = await supabase.storage
           .from('certificates')
           .upload(path, pdfBlob, {
