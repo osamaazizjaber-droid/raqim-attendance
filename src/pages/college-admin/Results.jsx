@@ -912,6 +912,10 @@ export default function CollegeAdminResults() {
         <div className={styles.pageHeader}>
           <h1 className={styles.pageTitle}>لوحة إدارة النتائج والشهادات</h1>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <Button onClick={openCertificateGeneratorModal} style={{ backgroundColor: 'var(--accent)', color: '#ffffff' }}>
+              <FileText size={18} />
+              <span>توليد وإدارة الشهادات</span>
+            </Button>
             <Button variant="secondary" onClick={handleExportTemplate}>
               <Download size={18} />
               <span>تصدير كشف درجات المرحلة (Excel)</span>
