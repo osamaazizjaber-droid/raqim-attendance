@@ -420,7 +420,7 @@ export const handleDownloadPdfCallback = async (bot, chatId, data) => {
 
     // إرسال ملف الـ PDF مباشرة داخل المحادثة كـ Buffer
     await bot.sendDocument(chatId, pdfBuffer, {
-      caption: `📄 <b>الشهادة الأكاديمية الرسمية - ${semester}\nالعام الدراسي: ${cert.academic_year}</b>\n• التقدير العام: <b>${cert.overall_grade}</b>\n• الحالة: <b>${cert.is_passed ? 'ناجح 🎉' : 'راسب ❌'}</b>`,
+      caption: `📄 <b>الشهادة الأكاديمية الرسمية - ${semester}\nالعام الدراسي: ${cert.academic_year}</b>\n• التقدير العام: <b>${(cert.overall_grade === 'مكمل' || cert.overall_grade === 'راسب') ? '-' : cert.overall_grade}</b>\n• الحالة: <b>${cert.is_passed ? 'ناجح 🎉' : (cert.overall_grade === 'مكمل' ? 'مكمل ⚠️' : 'راسب ❌')}</b>`,
       parse_mode: 'HTML'
     }, {
       filename: fileName,

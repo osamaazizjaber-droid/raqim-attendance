@@ -291,13 +291,21 @@ export const generateCertificatePDF = async ({
       ctx.fillText(text, x + w / 2, y + h / 2 + 8);
     };
 
-    const statusColor = isPassed ? '#047857' : '#B91C1C';
-    const statusText = isPassed ? 'ناجح' : 'راسب';
+    let statusText = 'راسب';
+    let statusColor = '#B91C1C';
+    if (isPassed === 'ناجح' || isPassed === true) {
+      statusText = 'ناجح';
+      statusColor = '#047857';
+    } else if (isPassed === 'مكمل') {
+      statusText = 'مكمل';
+      statusColor = '#D97706';
+    }
+    const displayGrade = (statusText === 'مكمل' || statusText === 'راسب') ? '-' : (overallGrade || 'غير متوفر');
     
     drawStatusCell(tableLeftX, tablesStartY, statusBoxW, statusRowH, '#E5E7EB', 'النتيجة', true);
     drawStatusCell(tableLeftX, tablesStartY + statusRowH, statusBoxW, statusRowH, '#FFFFFF', statusText, false, statusColor);
     drawStatusCell(tableLeftX, tablesStartY + statusRowH * 2, statusBoxW, statusRowH, '#E5E7EB', 'التقدير', true);
-    drawStatusCell(tableLeftX, tablesStartY + statusRowH * 3, statusBoxW, statusRowH, '#FFFFFF', overallGrade || 'غير متوفر', false, '#000000');
+    drawStatusCell(tableLeftX, tablesStartY + statusRowH * 3, statusBoxW, statusRowH, '#FFFFFF', displayGrade, false, '#000000');
 
     // B. DRAW MAIN SUBJECTS TABLE (Right side - RTL orientation)
     const subColW = mainTableW * 0.70;

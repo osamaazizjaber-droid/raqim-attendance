@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/Button';
 import logo from '../../assets/logo.png';
 import compStyles from '../../styles/components.module.css';
-import { computeOverallGrade, computeIsPassed } from '../../lib/gradeUtils';
+import { computeOverallGrade, computeIsPassed, computeStudentStatus } from '../../lib/gradeUtils';
 import { generateCertificatePDF } from '../../lib/certificateGenerator';
 
 // مساعد تحويل الأرقام إلى أرقام عربية لعرضها في الكابتشا
@@ -85,8 +85,9 @@ export default function ResultsLookup() {
         alert(`لا توجد درجات مسجلة في ${semester}`);
         return;
       }
-      const overallGrade = computeOverallGrade(semesterResults);
-      const isPassed = computeIsPassed(semesterResults);
+      const status = computeStudentStatus(semesterResults);
+      const isPassed = status === 'ناجح';
+      const overallGrade = status === 'ناجح' ? computeOverallGrade(semesterResults) : status;
       const academicYear = semesterResults[0]?.academic_year || '2024/2025';
       const university = { name: studentData?.colleges?.university || 'جامعة رقيم' };
       const college = { name: studentData?.colleges?.name || 'الكلية' };
@@ -97,8 +98,8 @@ export default function ResultsLookup() {
       const pdfBlob = await generateCertificatePDF({
         student: studentData,
         results: semesterResults,
-        overallGrade,
-        isPassed,
+        overallGrade: status === 'ناجح' ? overallGrade : '-',
+        isPassed: status,
         academicYear,
         university,
         college,

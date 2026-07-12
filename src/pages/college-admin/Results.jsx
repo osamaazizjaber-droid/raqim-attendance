@@ -9,7 +9,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Table, Tr, Th, Td } from '../../components/ui/Table';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
-import { computeOverallGrade, computeIsPassed } from '../../lib/gradeUtils';
+import { computeOverallGrade, computeIsPassed, computeStudentStatus } from '../../lib/gradeUtils';
 import { generateCertificatePDF } from '../../lib/certificateGenerator';
 import { CollegeAdminSidebar } from './Dashboard';
 import styles from '../../styles/admin.module.css';
@@ -200,14 +200,15 @@ export default function CollegeAdminResults() {
           continue;
         }
 
-        const overallGrade = computeOverallGrade(studentResults);
-        const isPassed = computeIsPassed(studentResults);
+        const status = computeStudentStatus(studentResults);
+        const isPassed = status === 'ناجح';
+        const overallGrade = status === 'ناجح' ? computeOverallGrade(studentResults) : status;
 
         const pdfBlob = await generateCertificatePDF({
           student,
           results: studentResults,
-          overallGrade,
-          isPassed,
+          overallGrade: status === 'ناجح' ? overallGrade : '-',
+          isPassed: status,
           academicYear,
           university,
           college,
@@ -629,15 +630,16 @@ export default function CollegeAdminResults() {
         }
 
         // 1. احسب التقدير العام والنتيجة
-        const overallGrade = computeOverallGrade(studentResults);
-        const isPassed = computeIsPassed(studentResults);
+        const status = computeStudentStatus(studentResults);
+        const isPassed = status === 'ناجح';
+        const overallGrade = status === 'ناجح' ? computeOverallGrade(studentResults) : status;
 
         // 2. ولّد PDF
         const pdfBlob = await generateCertificatePDF({
           student,
           results: studentResults,
-          overallGrade,
-          isPassed,
+          overallGrade: status === 'ناجح' ? overallGrade : '-',
+          isPassed: status,
           academicYear: selectedYear,
           university,
           college,
@@ -711,14 +713,15 @@ export default function CollegeAdminResults() {
 
         if (studentResults.length === 0) continue;
 
-        const overallGrade = computeOverallGrade(studentResults);
-        const isPassed = computeIsPassed(studentResults);
+        const status = computeStudentStatus(studentResults);
+        const isPassed = status === 'ناجح';
+        const overallGrade = status === 'ناجح' ? computeOverallGrade(studentResults) : status;
 
         const pdfBlob = await generateCertificatePDF({
           student,
           results: studentResults,
-          overallGrade,
-          isPassed,
+          overallGrade: status === 'ناجح' ? overallGrade : '-',
+          isPassed: status,
           academicYear: selectedYear,
           university,
           college,

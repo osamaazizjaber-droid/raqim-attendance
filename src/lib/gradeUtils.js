@@ -34,3 +34,11 @@ export const computeIsPassed = (results) => {
   if (!results || results.length === 0) return false;
   return !results.some(r => r.grade_label === 'ضعيف');
 };
+
+export const computeStudentStatus = (results) => {
+  if (!results || results.length === 0) return 'راسب';
+  const failedCount = results.filter(r => r.grade_label === 'ضعيف').length;
+  if (failedCount === 0) return 'ناجح';
+  if (failedCount < 3) return 'مكمل';
+  return 'راسب';
+};
