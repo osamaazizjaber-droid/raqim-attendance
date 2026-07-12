@@ -279,7 +279,8 @@ export default function CollegeAdminResults() {
       const fixedKeys = [
         'student_number', 'الرقم الجامعي', 'الرقم',
         'academic_year', 'السنة الدراسية', 'العام الدراسي', 'السنة',
-        'full_name', 'الاسم الكامل', 'الاسم', 'اسم الطالب', 'الاسم الثلاثي'
+        'full_name', 'الاسم الكامل', 'الاسم', 'اسم الطالب', 'الاسم الثلاثي',
+        'semester', 'الكورس', 'الفصل', 'الفصل الدراسي'
       ];
 
       resultsPreview.forEach((row, idx) => {
@@ -743,22 +744,44 @@ export default function CollegeAdminResults() {
   };
 
   // دالة لتحميل نموذج ملف كشف الدرجات بصيغة CSV تدعم الترميز العربي بترميز UTF-8 BOM
-  const downloadTemplate = () => {
-    const csvContent = 'الرقم الجامعي,اسم الطالب,هياكل البيانات,الذكاء الاصطناعي,شبكات الحاسوب,السنة الدراسية\n' +
-      '1001,علي أحمد حسين,85.5,امتياز,جيد,2024/2025\n' +
-      '1002,فاطمة عباس محمد,,مقبول,متوسط,2024/2025\n' +
-      '1003,أحمد رعد علي,92.0,,جيد جداً,2024/2025\n' +
-      '1004,زينب جعفر حسن,73.5,جيد جداً,,2024/2025\n';
-    
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'نموذج_درجات_رقيم.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const downloadTemplate = async () => {
+    if (!selectedDept || !selectedStage || !selectedYear) {
+      showToast('تنبيه', 'يرجى اختيار القسم والمرحلة والسنة الدراسية أولاً من الفلاتر لتحميل النموذج الخاص بها.', 'warning');
+      return;
+    }
+
+    try {
+      // جلب المواد الخاصة بالقسم والمرحلة والكورس المحددين
+      const { data: coursesData } = await supabase
+        .from('courses')
+        .select('name')
+        .eq('department_id', selectedDept)
+        .eq('stage_id', selectedStage)
+        .eq('semester', selectedSemester);
+
+      const courseNames = coursesData?.map(c => c.name) || [];
+      if (courseNames.length === 0) {
+        showToast('تنبيه', 'لا توجد مواد مسجلة لهذا القسم وهذه المرحلة في الكورس المحدد.', 'warning');
+        return;
+      }
+
+      const csvHeaders = ['الرقم الجامعي', 'اسم الطالب', ...courseNames, 'العام الدراسي', 'الكورس'].join(',');
+      const sampleRow = ['1001', 'علي أحمد حسين', ...courseNames.map(() => '85.5'), selectedYear, selectedSemester].join(',');
+      
+      const csvContent = `${csvHeaders}\n${sampleRow}\n`;
+      
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'نموذج_درجات_رقيم.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      showToast('خطأ', 'فشل تحميل النموذج التجريبي', 'danger');
+    }
   };
 
   // دالة تصدير كشف درجات المرحلة بترميز Excel وتضمين المواد المسجلة والطلاب والدرجات الحالية
@@ -837,6 +860,7 @@ export default function CollegeAdminResults() {
         });
 
         row['العام الدراسي'] = selectedYear;
+        row['الكورس'] = selectedSemester;
         return row;
       });
 
