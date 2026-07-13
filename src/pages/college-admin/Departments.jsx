@@ -429,7 +429,6 @@ export default function CollegeAdminDepartments() {
                 type="number" 
                 step="any"
                 min="1"
-                max="10"
                 required
                 className={compStyles.input}
                 value={courseForm.units}
