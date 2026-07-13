@@ -1231,8 +1231,8 @@ export default function CollegeAdminResults() {
                         <option value="جيد جداً">جيد جداً (80 - 89)</option>
                         <option value="جيد">جيد (70 - 79)</option>
                         <option value="متوسط">متوسط (60 - 69)</option>
-                        <option value="مقبول">مقبول (50 - 59)</option>
-                        <option value="ضعيف">ضعيف (0 - 49)</option>
+                        <option value="مقبول">مقبول (49 - 59)</option>
+                        <option value="ضعيف">ضعيف (0 - 48)</option>
                       </select>
                     </div>
 
