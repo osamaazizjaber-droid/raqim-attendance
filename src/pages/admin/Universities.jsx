@@ -32,7 +32,7 @@ export default function AdminUniversities() {
   // Form inputs
   const [univForm, setUnivForm] = useState({ id: null, name: '', city: '' });
   const [deptForm, setDeptForm] = useState({ name: '' });
-  const [courseForm, setCourseForm] = useState({ name: '', stage_id: '' });
+  const [courseForm, setCourseForm] = useState({ name: '', stage_id: '', units: 1, semester: 'الكورس الأول' });
 
   // Initial load
   useEffect(() => {
@@ -202,12 +202,14 @@ export default function AdminUniversities() {
         .insert({ 
           name: courseForm.name, 
           department_id: selectedDept.id,
-          stage_id: courseForm.stage_id 
+          stage_id: courseForm.stage_id,
+          units: parseFloat(courseForm.units) || 1,
+          semester: courseForm.semester || 'الكورس الأول'
         });
       if (error) throw error;
       showToast('نجاح', 'تم إضافة المادة الدراسية بنجاح', 'success');
       setIsCourseModalOpen(false);
-      setCourseForm({ name: '', stage_id: '' });
+      setCourseForm({ name: '', stage_id: '', units: 1, semester: 'الكورس الأول' });
       fetchDeptCourses(selectedDept.id);
     } catch (err) {
       showToast('خطأ', err.message || 'فشل إضافة المادة', 'danger');
@@ -344,7 +346,10 @@ export default function AdminUniversities() {
                         <h4 style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>المواد الدراسية لقسم ({selectedDept.name})</h4>
                         <Button 
                           variant="outline"
-                          onClick={() => setIsCourseModalOpen(true)}
+                          onClick={() => {
+                            setCourseForm({ name: '', stage_id: stages[0]?.id || '', units: 1, semester: 'الكورس الأول' });
+                            setIsCourseModalOpen(true);
+                          }}
                           icon={PlusCircle}
                         >
                           إضافة مادة
@@ -356,6 +361,8 @@ export default function AdminUniversities() {
                           <Tr>
                             <Th>اسم المادة</Th>
                             <Th>المرحلة</Th>
+                            <Th>الوحدات</Th>
+                            <Th>الكورس</Th>
                             <Th style={{ width: '80px' }}>حذف</Th>
                           </Tr>
                         </thead>
@@ -364,6 +371,8 @@ export default function AdminUniversities() {
                             <Tr key={course.id}>
                               <Td>{course.name}</Td>
                               <Td>{course.stages?.name || 'غير محدد'}</Td>
+                              <Td>{course.units || 1}</Td>
+                              <Td>{course.semester || 'الكورس الأول'}</Td>
                               <Td>
                                 <button
                                   onClick={() => deleteCourse(course.id, course.name)}
@@ -376,7 +385,7 @@ export default function AdminUniversities() {
                           ))}
                           {courses.length === 0 && (
                             <Tr>
-                              <Td colSpan="3" style={{ textAlign: 'center', padding: '2rem' }}>
+                              <Td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>
                                 لا توجد مواد دراسية في هذا القسم بعد. أضف مادة للبدء.
                               </Td>
                             </Tr>
@@ -466,7 +475,7 @@ export default function AdminUniversities() {
         onClose={() => setIsCourseModalOpen(false)}
         title={`إضافة مادة دراسية لقسم ${selectedDept?.name}`}
       >
-        <form onSubmit={createCourse}>
+        <form onSubmit={createCourse} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div className={compStyles.inputGroup}>
             <label className={compStyles.label}>اسم المادة الدراسية</label>
             <input 
@@ -494,8 +503,35 @@ export default function AdminUniversities() {
             </select>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-            <Button variant="secondary" onClick={() => setIsCourseModalOpen(false)}>إلغاء</Button>
+          <div className={compStyles.inputGroup}>
+            <label className={compStyles.label}>عدد الوحدات (Units)</label>
+            <input 
+              type="number" 
+              step="any"
+              min="1"
+              max="10"
+              required
+              className={compStyles.input}
+              value={courseForm.units}
+              onChange={e => setCourseForm({ ...courseForm, units: e.target.value })}
+            />
+          </div>
+
+          <div className={compStyles.inputGroup}>
+            <label className={compStyles.label}>الفصل الدراسي / الكورس</label>
+            <select
+              required
+              className={compStyles.select}
+              value={courseForm.semester}
+              onChange={e => setCourseForm({ ...courseForm, semester: e.target.value })}
+            >
+              <option value="الكورس الأول">الكورس الأول</option>
+              <option value="الكورس الثاني">الكورس الثاني</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+            <Button variant="secondary" type="button" onClick={() => setIsCourseModalOpen(false)}>إلغاء</Button>
             <Button type="submit">إضافة المادة</Button>
           </div>
         </form>
