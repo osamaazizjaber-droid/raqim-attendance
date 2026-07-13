@@ -52,6 +52,10 @@ export default function AdminStudents() {
   // View QR Modal
   const [selectedQrStudent, setSelectedQrStudent] = useState(null);
 
+  // QR Code Generation States
+  const [isGeneratingQR, setIsGeneratingQR] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -307,10 +311,6 @@ export default function AdminStudents() {
         }
         const stageId = stage?.id;
 
-        // حساب الرابط بشكل قطعي دون إرسال طلب سوبابيس (توفيراً للوقت والاتصال)
-        const path = `${importUnivId}/${studentId}.png`;
-        const { data: { publicUrl } } = supabase.storage.from('qr-cards').getPublicUrl(path);
-
         const newStudent = {
           id: studentId,
           university_id: importUnivId,
@@ -319,7 +319,7 @@ export default function AdminStudents() {
           full_name: studentRow.full_name.trim(),
           student_number: studentRow.student_number.trim(),
           qr_token: qrToken,
-          qr_image_url: publicUrl,
+          qr_image_url: null,
           study_type: studentRow.study_type
         };
 
@@ -333,33 +333,7 @@ export default function AdminStudents() {
 
       if (insertErr) throw insertErr;
 
-      // هـ. توليد ورفع صور الـ QR على خادم سوبابيس مع مجموعة عمال متوازية (concurrency: 12) لسرعة استثنائية
-      const concurrency = 12;
-      let currentIndex = 0;
-      let completedCount = 0;
-
-      const worker = async () => {
-        while (currentIndex < studentsToInsert.length) {
-          const student = studentsToInsert[currentIndex++];
-          if (!student) break;
-          try {
-            await generateAndUploadQRCard(student, univName);
-          } catch (qrErr) {
-            console.error(`فشل رفع كود QR للطالب ${student.full_name}:`, qrErr);
-          } finally {
-            completedCount++;
-            setImportProgress({ current: completedCount, total: studentsToInsert.length });
-          }
-        }
-      };
-
-      const workers = [];
-      for (let w = 0; w < Math.min(concurrency, studentsToInsert.length); w++) {
-        workers.push(worker());
-      }
-      await Promise.all(workers);
-
-      showToast('نجاح الاستيراد', `تم استيراد ${studentsToInsert.length} طالب جديد وتوليد بطاقات الـ QR الخاصة بهم بنجاح وسرعة فائقة.`, 'success');
+      showToast('نجاح الاستيراد', `تم استيراد ${studentsToInsert.length} طالب جديد بنجاح. يمكنك الآن توليد بطاقات الـ QR الخاصة بهم.`, 'success');
       setIsImportModalOpen(false);
       setCsvPreview([]);
       setImportUnivId('');
@@ -369,6 +343,98 @@ export default function AdminStudents() {
       showToast('فشل الاستيراد', err.message || 'حدث خطأ أثناء عملية الاستيراد السريعة', 'danger');
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  // توليد كود QR لطالب منفرد
+  const handleGenerateSingleQR = async (student) => {
+    try {
+      showToast('جاري التوليد', `جاري توليد بطاقة الـ QR للطالب ${student.full_name}...`, 'info');
+      const univName = student.universities?.name || universities.find(u => u.id === student.university_id)?.name || 'جامعة رقيم';
+      
+      const publicUrl = await generateAndUploadQRCard(student, univName);
+      
+      const { error } = await supabase
+        .from('students')
+        .update({ qr_image_url: publicUrl })
+        .eq('id', student.id);
+
+      if (error) throw error;
+
+      showToast('نجاح ✅', `تم توليد بطاقة الطالب ${student.full_name} بنجاح.`, 'success');
+      
+      // تحديث الحالة المحلية
+      setStudents(prev => prev.map(s => s.id === student.id ? { ...s, qr_image_url: publicUrl } : s));
+    } catch (err) {
+      console.error(err);
+      showToast('خطأ في التوليد', err.message || 'فشل توليد بطاقة الطالب', 'danger');
+    }
+  };
+
+  // توليد كروت QR دفعة واحدة للطلاب المعروضين والمعلقين
+  const handleGenerateBulkQR = async () => {
+    const pendingStudents = filteredStudents.filter(s => !s.qr_image_url && !s.telegram_chat_id);
+    
+    if (pendingStudents.length === 0) {
+      showToast('تنبيه', 'لا يوجد طلاب بحاجة لتوليد بطاقات QR حالياً ضمن القائمة المحددة.', 'warning');
+      return;
+    }
+
+    if (!window.confirm(`هل أنت متأكد من البدء في توليد بطاقات الـ QR لعدد (${pendingStudents.length}) طالب معلّق؟`)) return;
+
+    setIsGeneratingQR(true);
+    setGenerationProgress({ current: 0, total: pendingStudents.length });
+
+    try {
+      const concurrency = 12;
+      let currentIndex = 0;
+      let completedCount = 0;
+      const updatedStudents = [];
+
+      const worker = async () => {
+        while (currentIndex < pendingStudents.length) {
+          const index = currentIndex++;
+          const student = pendingStudents[index];
+          if (!student) break;
+          
+          try {
+            const univName = student.universities?.name || universities.find(u => u.id === student.university_id)?.name || 'جامعة رقيم';
+            const publicUrl = await generateAndUploadQRCard(student, univName);
+            
+            const { error } = await supabase
+              .from('students')
+              .update({ qr_image_url: publicUrl })
+              .eq('id', student.id);
+              
+            if (error) throw error;
+            
+            updatedStudents.push({ id: student.id, qr_image_url: publicUrl });
+          } catch (err) {
+            console.error(`فشل توليد كود الطالب ${student.full_name}:`, err);
+          } finally {
+            completedCount++;
+            setGenerationProgress({ current: completedCount, total: pendingStudents.length });
+          }
+        }
+      };
+
+      const workers = [];
+      for (let w = 0; w < Math.min(concurrency, pendingStudents.length); w++) {
+        workers.push(worker());
+      }
+      await Promise.all(workers);
+
+      // تحديث الحالة المحلية دفعة واحدة
+      setStudents(prev => prev.map(s => {
+        const match = updatedStudents.find(up => up.id === s.id);
+        return match ? { ...s, qr_image_url: match.qr_image_url } : s;
+      }));
+
+      showToast('نجاح العملية', `تم توليد بطاقات الـ QR لعدد ${completedCount} طالب بنجاح.`, 'success');
+    } catch (err) {
+      showToast('خطأ', err.message || 'حدث خطأ أثناء عملية التوليد الجماعي', 'danger');
+    } finally {
+      setIsGeneratingQR(false);
     }
   };
 
@@ -557,6 +623,16 @@ export default function AdminStudents() {
         <div className={styles.pageHeader}>
           <h1 className={styles.pageTitle}>إدارة الطلاب وبطاقات الحضور</h1>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
+            {filteredStudents.filter(s => !s.qr_image_url && !s.telegram_chat_id).length > 0 && (
+              <Button
+                variant="primary"
+                onClick={handleGenerateBulkQR}
+                icon={QrCode}
+                style={{ backgroundColor: '#10b981', borderColor: '#10b981', color: '#ffffff' }}
+              >
+                توليد الكروت المعلقة ({filteredStudents.filter(s => !s.qr_image_url && !s.telegram_chat_id).length})
+              </Button>
+            )}
             {filteredStudents.length > 0 && (
               <Button 
                 variant="danger" 
@@ -793,14 +869,25 @@ export default function AdminStudents() {
                     </Td>
                     <Td>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => setSelectedQrStudent(student)}
-                          className={`${compStyles.btn} ${compStyles.btnOutline}`}
-                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
-                        >
-                          <QrCode size={14} style={{ marginLeft: '0.25rem' }} />
-                          عرض
-                        </button>
+                        {student.qr_image_url || student.telegram_chat_id ? (
+                          <button
+                            onClick={() => setSelectedQrStudent(student)}
+                            className={`${compStyles.btn} ${compStyles.btnOutline}`}
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                          >
+                            <QrCode size={14} style={{ marginLeft: '0.25rem' }} />
+                            عرض
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleGenerateSingleQR(student)}
+                            className={`${compStyles.btn} ${compStyles.btnPrimary}`}
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', backgroundColor: 'var(--accent)', color: '#fff' }}
+                          >
+                            <QrCode size={14} style={{ marginLeft: '0.25rem' }} />
+                            توليد كود
+                          </button>
+                        )}
                         <button
                           onClick={() => triggerTelegramResend(student)}
                           disabled={!student.telegram_chat_id}
@@ -844,20 +931,10 @@ export default function AdminStudents() {
         {isImporting ? (
           <div style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--accent)' }}>
-              جاري توليد ورفع بطاقات الحضور...
-            </div>
-            <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden', marginBottom: '1rem' }}>
-              <div 
-                style={{ 
-                  height: '100%', 
-                  backgroundColor: 'var(--accent)', 
-                  width: `${(importProgress.current / importProgress.total) * 100}%`,
-                  transition: 'width 0.2s ease-out'
-                }} 
-              />
+              جاري حفظ الطلاب المستوردين في قاعدة البيانات...
             </div>
             <div style={{ color: 'var(--text-secondary)' }}>
-              معالجة الطالب {importProgress.current} من أصل {importProgress.total}...
+              يرجى الانتظار، تتم العملية بسرعة فائقة الآن...
             </div>
           </div>
         ) : (
@@ -1000,6 +1077,32 @@ export default function AdminStudents() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* مودال توليد كروت الـ QR الجماعي */}
+      <Modal
+        isOpen={isGeneratingQR}
+        onClose={() => {}} // يمنع الإغلاق أثناء التوليد لضمان عدم المقاطعة
+        title="توليد بطاقات الـ QR للطلاب"
+      >
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--accent)' }}>
+            جاري توليد ورفع بطاقات الـ QR...
+          </div>
+          <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden', marginBottom: '1rem' }}>
+            <div 
+              style={{ 
+                height: '100%', 
+                backgroundColor: 'var(--accent)', 
+                width: `${(generationProgress.current / generationProgress.total) * 100}%`,
+                transition: 'width 0.2s ease-out'
+              }} 
+            />
+          </div>
+          <div style={{ color: 'var(--text-secondary)' }}>
+            معالجة الطالب {generationProgress.current} من أصل {generationProgress.total}...
+          </div>
+        </div>
       </Modal>
 
     </div>
