@@ -451,6 +451,12 @@ async function handleViewResults(chatId) {
     responseText += `🎓 <b>القسم والمرحلة:</b> ${student.departments?.name || '-'} (${student.stages?.name || 'المرحلة الدراسية'})\n`;
     responseText += `──────────────────\n`;
 
+    // عرض المواد والتقديرات نصياً داخل رسالة البوت
+    results.forEach(res => {
+      responseText += `🔹 <b>${res.courses?.name || 'مادة'}:</b> ${res.grade_label || '-'}\n`;
+    });
+    responseText += `──────────────────\n`;
+
     // تجهيز أزرار تحميل الشهادات المتوفرة للتحميل المباشر داخل البوت
     const inlineButtons = [];
     if (certificates && certificates.length > 0) {
