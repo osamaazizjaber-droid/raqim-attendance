@@ -5,6 +5,8 @@ const GRADE_SCORES = {
   'متوسط':    3,
   'مقبول':    2,
   'ضعيف':     1,
+  'ضعيف جداً': 1,
+  'راسب':     1,
 };
 
 const GRADE_FROM_SCORE = [
@@ -28,16 +30,16 @@ export const computeOverallGrade = (results) => {
 };
 
 /**
- * الطالب ناجح إذا لم يحصل على تقدير "ضعيف" في أي مادة.
+ * الطالب ناجح إذا لم يحصل على تقدير "ضعيف" أو "ضعيف جداً" أو "راسب" في أي مادة.
  */
 export const computeIsPassed = (results) => {
   if (!results || results.length === 0) return false;
-  return !results.some(r => r.grade_label === 'ضعيف');
+  return !results.some(r => ['ضعيف', 'ضعيف جداً', 'راسب'].includes(r.grade_label));
 };
 
 export const computeStudentStatus = (results) => {
   if (!results || results.length === 0) return 'راسب';
-  const failedCount = results.filter(r => r.grade_label === 'ضعيف').length;
+  const failedCount = results.filter(r => ['ضعيف', 'ضعيف جداً', 'راسب'].includes(r.grade_label)).length;
   if (failedCount === 0) return 'ناجح';
   if (failedCount < 3) return 'مكمل';
   return 'راسب';
