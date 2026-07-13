@@ -265,7 +265,7 @@ export default function CollegeAdminResults() {
       // 1. جلب كافة طلاب وأقسام الكلية للتحقق السريع
       const { data: allStudents } = await supabase
         .from('students')
-        .select('id, student_number')
+        .select('id, full_name, student_number')
         .eq('college_id', adminDetails.college_id);
 
       const { data: allCourses } = await supabase
@@ -273,7 +273,20 @@ export default function CollegeAdminResults() {
         .select('id, name, department_id, semester, departments!inner(college_id)')
         .eq('departments.college_id', adminDetails.college_id);
 
-      const studentsMap = new Map(allStudents.map(s => [s.student_number.trim(), s.id]));
+      // دالة لتسوية الحروف العربية لتجنب اختلاف الإملاء (أحمد/احمد، فاطمة/فاطمه، علي/على)
+      const normalizeArabic = (str) => {
+        if (!str) return '';
+        return String(str)
+          .toLowerCase()
+          .replace(/[أإآ]/g, 'ا')
+          .replace(/ة/g, 'ه')
+          .replace(/ى/g, 'ي')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      const studentsByNameMap = new Map((allStudents || []).map(s => [normalizeArabic(s.full_name), s.id]));
+      const studentsByNumberMap = new Map((allStudents || []).map(s => [String(s.student_number || '').trim().toLowerCase(), s.id]));
       const coursesMap = new Map(allCourses.map(c => [c.name.trim().toLowerCase(), c.id]));
 
       const resultsToInsert = [];
@@ -287,12 +300,21 @@ export default function CollegeAdminResults() {
       ];
 
       resultsPreview.forEach((row, idx) => {
+        const studentName = String(
+          row.full_name || 
+          row['الاسم الكامل'] || 
+          row['الاسم'] || 
+          row['اسم الطالب'] || 
+          row['الاسم الثلاثي'] ||
+          ''
+        ).trim();
+
         const studNum = String(
           row.student_number || 
           row['الرقم الجامعي'] || 
           row['الرقم'] || 
           ''
-        ).trim();
+        ).trim().toLowerCase();
 
         const year = String(
           row.academic_year || 
@@ -303,7 +325,14 @@ export default function CollegeAdminResults() {
           '2024/2025'
         ).trim();
 
-        const studentId = studentsMap.get(studNum);
+        let studentId = null;
+        if (studentName) {
+          studentId = studentsByNameMap.get(normalizeArabic(studentName));
+        }
+        if (!studentId && studNum) {
+          studentId = studentsByNumberMap.get(studNum);
+        }
+
         if (!studentId) return;
 
         // المرور على كافة الأعمدة المتبقية والتي تمثل المواد
