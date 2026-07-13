@@ -16,9 +16,6 @@ export const handleStart = async (bot, msg) => {
 
 ----------------------------------
 <b>منصة رقيم © 2026 جميع الحقوق محفوظة</b>
-📞 للتواصل والدعم الفني:
-• البريد: osamaazizjaber@gmail.com
-• واتساب / هاتف: +9647716739456
 `;
   await bot.sendMessage(chatId, welcomeText, { parse_mode: 'HTML' });
 };
@@ -35,9 +32,6 @@ export const handleHelp = async (bot, msg) => {
 
 ----------------------------------
 <b>منصة رقيم © 2026 جميع الحقوق محفوظة</b>
-📞 للتواصل والدعم الفني:
-• البريد: osamaazizjaber@gmail.com
-• واتساب / هاتف: +9647716739456
 `;
   await bot.sendMessage(chatId, helpText, { parse_mode: 'HTML' });
 };
@@ -318,9 +312,6 @@ export const handleViewResults = async (bot, chatId) => {
     responseText += `🏫 <b>الجامعة والكلية:</b> ${student.colleges?.university || 'جامعة رقيم'} - ${student.colleges?.name || '-'}\n`;
     responseText += `🎓 <b>القسم والمرحلة:</b> ${student.departments?.name || '-'} (${student.stages?.name || 'المرحلة الدراسية'})\n`;
     responseText += `──────────────────\n`;
-    responseText += `\n👨‍💻 <b>مطور النظام:</b> م.اسامة العياش\n`;
-    responseText += `✉️ <b>البريد:</b> osamaazizjaber@gmail.com\n`;
-    responseText += `📞 <b>هاتف / واتساب:</b> +9647716739456\n`;
 
     // تجهيز أزرار تحميل الشهادات المتوفرة للتحميل المباشر داخل البوت
     const inlineButtons = [];
