@@ -39,6 +39,7 @@ export const handleHelp = async (bot, msg) => {
 // معالجة كافة الرسائل النصية والتحكم في الحالات
 export const handleTextMessage = async (bot, msg) => {
   const chatId = msg.chat.id;
+  if (!msg.text) return;
   const text = msg.text.trim();
 
   // نتجاهل الأوامر الرسمية التي تبدأ بـ /start أو /help لأنها تُعالج في مستمعيها الخاصين
