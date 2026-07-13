@@ -921,8 +921,18 @@ export default function CollegeAdminStudents() {
         )}
 
         {/* مودال الطالب الفردي */}
-        <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="إضافة طالب جديد">
-          <form onSubmit={handleCreateStudent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <Modal 
+          isOpen={isCreateModalOpen} 
+          onClose={() => setIsCreateModalOpen(false)} 
+          title="إضافة طالب جديد"
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setIsCreateModalOpen(false)}>إلغاء</Button>
+              <Button type="submit" form="createStudentForm">تسجيل وتوليد QR</Button>
+            </>
+          }
+        >
+          <form id="createStudentForm" onSubmit={handleCreateStudent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className={compStyles.inputGroup}>
               <label className={compStyles.label}>الاسم الكامل للطالب (رباعي)</label>
               <input 
@@ -947,7 +957,7 @@ export default function CollegeAdminStudents() {
             <div className={compStyles.inputGroup}>
               <label className={compStyles.label}>القسم العلمي</label>
               <select 
-                className={compStyles.input}
+                className={compStyles.select}
                 value={studentForm.department_id}
                 onChange={e => setStudentForm({ ...studentForm, department_id: e.target.value })}
                 required
@@ -961,7 +971,7 @@ export default function CollegeAdminStudents() {
             <div className={compStyles.inputGroup}>
               <label className={compStyles.label}>المرحلة الدراسية</label>
               <select 
-                className={compStyles.input}
+                className={compStyles.select}
                 value={studentForm.stage_id}
                 onChange={e => setStudentForm({ ...studentForm, stage_id: e.target.value })}
                 required
@@ -975,7 +985,7 @@ export default function CollegeAdminStudents() {
             <div className={compStyles.inputGroup}>
               <label className={compStyles.label}>نوع الدراسة</label>
               <select 
-                className={compStyles.input}
+                className={compStyles.select}
                 value={studentForm.study_type}
                 onChange={e => setStudentForm({ ...studentForm, study_type: e.target.value })}
                 required
@@ -984,15 +994,29 @@ export default function CollegeAdminStudents() {
                 <option value="مسائي">مسائي</option>
               </select>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-              <Button type="button" variant="secondary" onClick={() => setIsCreateModalOpen(false)}>إلغاء</Button>
-              <Button type="submit">تسجيل وتوليد QR</Button>
-            </div>
           </form>
         </Modal>
 
         {/* مودال الاستيراد الجماعي */}
-        <Modal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} title="استيراد كشف كروت الطلاب جماعياً">
+        <Modal 
+          isOpen={isImportModalOpen} 
+          onClose={() => setIsImportModalOpen(false)} 
+          title="استيراد كشف كروت الطلاب جماعياً"
+          footer={
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <Button variant="secondary" onClick={downloadTemplate} style={{ marginLeft: 'auto' }}>
+                <Download size={16} />
+                <span>تحميل النموذج (CSV)</span>
+              </Button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <Button variant="secondary" onClick={() => { setIsImportModalOpen(false); setCsvPreview([]); }} disabled={isImporting}>إلغاء</Button>
+                <Button onClick={executeImport} disabled={csvPreview.length === 0 || isImporting}>
+                  <span>بدء الاستيراد</span>
+                </Button>
+              </div>
+            </div>
+          }
+        >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className={styles.glass} style={{ padding: '1rem', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)' }}>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
@@ -1000,11 +1024,11 @@ export default function CollegeAdminStudents() {
                 <br />
                 يجب أن يكون الملف بامتداد <b>.csv</b> ويحتوي على الأعمدة باللغة العربية أو الإنجليزية:
                 <br />
-                <code style={{ direction: 'rtl', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px', margin: '0.5rem 0', fontFamily: 'monospace' }}>
+                <code style={{ direction: 'rtl', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px', margin: '0.5rem 0', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                   الاسم الكامل، الرقم الجامعي (اختياري)، القسم، المرحلة، نوع الدراسة، القسط (للمسائي) (اختياري)، منصة HEPIC (اختياري)
                 </code>
                 أو بالإنجليزية:
-                <code style={{ direction: 'ltr', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px', margin: '0.5rem 0', fontFamily: 'monospace' }}>
+                <code style={{ direction: 'ltr', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px', margin: '0.5rem 0', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                   full_name, student_number (optional), department, stage, study_type, fees_paid, hepic_registered
                 </code>
                 * في حال ترك حقل <b>الرقم الجامعي</b> فارغاً، سيقوم النظام تلقائياً بتوليد رمز رقمي عشوائي فريد ومؤمن لكل طالب.
@@ -1062,24 +1086,18 @@ export default function CollegeAdminStudents() {
                 </div>
               </div>
             )}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '1rem', width: '100%' }}>
-              <Button variant="secondary" onClick={downloadTemplate} style={{ marginLeft: 'auto' }}>
-                <Download size={16} />
-                <span>تحميل النموذج التجريبي (CSV)</span>
-              </Button>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <Button variant="secondary" onClick={() => { setIsImportModalOpen(false); setCsvPreview([]); }} disabled={isImporting}>إلغاء</Button>
-                <Button onClick={executeImport} disabled={csvPreview.length === 0 || isImporting}>
-                  <span>بدء الاستيراد وتوليد الكروت</span>
-                </Button>
-              </div>
-            </div>
           </div>
         </Modal>
 
         {/* مودال إدارة المقررات والانتساب للمواد ومواد الإعادة */}
-        <Modal isOpen={isCoursesModalOpen} onClose={() => setIsCoursesModalOpen(false)} title={`إدارة المقررات الدراسية للطالب: ${activeStudent?.full_name || ''}`}>
+        <Modal 
+          isOpen={isCoursesModalOpen} 
+          onClose={() => setIsCoursesModalOpen(false)} 
+          title={`إدارة المقررات الدراسية للطالب: ${activeStudent?.full_name || ''}`}
+          footer={
+            <Button variant="secondary" onClick={() => setIsCoursesModalOpen(false)}>إغلاق النافذة</Button>
+          }
+        >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             
             {/* تسجيل مادة جديدة */}
@@ -1092,7 +1110,7 @@ export default function CollegeAdminStudents() {
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <div className={compStyles.inputGroup} style={{ margin: 0, flex: 1, minWidth: '150px' }}>
                   <select 
-                    className={compStyles.input} 
+                    className={compStyles.select} 
                     value={courseForm.course_id} 
                     onChange={e => setCourseForm({ ...courseForm, course_id: e.target.value })} 
                     required
@@ -1117,7 +1135,7 @@ export default function CollegeAdminStudents() {
 
                 <div className={compStyles.inputGroup} style={{ margin: 0, width: '100px' }}>
                   <select 
-                    className={compStyles.input} 
+                    className={compStyles.select} 
                     value={courseForm.type} 
                     onChange={e => setCourseForm({ ...courseForm, type: e.target.value })}
                   >
@@ -1172,10 +1190,6 @@ export default function CollegeAdminStudents() {
                 </div>
               )}
             </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button variant="secondary" onClick={() => setIsCoursesModalOpen(false)}>إغلاق النافذة</Button>
-            </div>
           </div>
         </Modal>
 
@@ -1184,6 +1198,29 @@ export default function CollegeAdminStudents() {
           isOpen={isQrModalOpen} 
           onClose={() => setIsQrModalOpen(false)} 
           title={`بطاقة الحضور: ${activeStudent?.full_name || ''}`}
+          footer={
+            <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+              <Button 
+                variant="secondary" 
+                onClick={() => setIsQrModalOpen(false)}
+                style={{ flex: 1 }}
+              >
+                إغلاق
+              </Button>
+              <a 
+                href={activeStudent?.qr_image_url || ''} 
+                download={`${activeStudent?.full_name?.replace(/\s+/g, '_') || 'student'}_QR.png`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ flex: 1, textDecoration: 'none' }}
+              >
+                <Button style={{ width: '100%' }}>
+                  <Download size={16} />
+                  <span>تحميل الكارت</span>
+                </Button>
+              </a>
+            </div>
+          }
         >
           {activeStudent?.qr_image_url ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', padding: '1rem' }}>
@@ -1198,27 +1235,6 @@ export default function CollegeAdminStudents() {
                   border: '1px solid var(--border)' 
                 }} 
               />
-              <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
-                <Button 
-                  variant="secondary" 
-                  onClick={() => setIsQrModalOpen(false)}
-                  style={{ flex: 1 }}
-                >
-                  إغلاق
-                </Button>
-                <a 
-                  href={activeStudent.qr_image_url} 
-                  download={`${activeStudent.full_name.replace(/\s+/g, '_')}_QR.png`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ flex: 1, textDecoration: 'none' }}
-                >
-                  <Button style={{ width: '100%' }}>
-                    <Download size={16} />
-                    <span>تحميل الكارت</span>
-                  </Button>
-                </a>
-              </div>
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
