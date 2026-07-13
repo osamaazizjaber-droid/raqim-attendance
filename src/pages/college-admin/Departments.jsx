@@ -359,8 +359,18 @@ export default function CollegeAdminDepartments() {
         )}
 
         {/* مودال القسم */}
-        <Modal isOpen={isDeptModalOpen} onClose={() => setIsDeptModalOpen(false)} title={deptForm.id ? 'تعديل قسم' : 'إضافة قسم جديد'}>
-          <form onSubmit={saveDepartment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <Modal 
+          isOpen={isDeptModalOpen} 
+          onClose={() => setIsDeptModalOpen(false)} 
+          title={deptForm.id ? 'تعديل قسم' : 'إضافة قسم جديد'}
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setIsDeptModalOpen(false)}>إلغاء</Button>
+              <Button type="submit" form="deptForm">حفظ القسم</Button>
+            </>
+          }
+        >
+          <form id="deptForm" onSubmit={saveDepartment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className={compStyles.inputGroup}>
               <label className={compStyles.label}>اسم القسم</label>
               <input 
@@ -372,16 +382,22 @@ export default function CollegeAdminDepartments() {
                 placeholder="علوم الحاسوب مثلاً"
               />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-              <Button type="button" variant="secondary" onClick={() => setIsDeptModalOpen(false)}>إلغاء</Button>
-              <Button type="submit">حفظ القسم</Button>
-            </div>
           </form>
         </Modal>
 
         {/* مودال المادة */}
-        <Modal isOpen={isCourseModalOpen} onClose={() => setIsCourseModalOpen(false)} title={courseForm.id ? 'تعديل مادة' : 'إضافة مادة جديدة'}>
-          <form onSubmit={saveCourse} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <Modal 
+          isOpen={isCourseModalOpen} 
+          onClose={() => setIsCourseModalOpen(false)} 
+          title={courseForm.id ? 'تعديل مادة' : 'إضافة مادة جديدة'}
+          footer={
+            <>
+              <Button type="button" variant="secondary" onClick={() => setIsCourseModalOpen(false)}>إلغاء</Button>
+              <Button type="submit" form="courseForm">حفظ المادة</Button>
+            </>
+          }
+        >
+          <form id="courseForm" onSubmit={saveCourse} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className={compStyles.inputGroup}>
               <label className={compStyles.label}>اسم المادة</label>
               <input 
@@ -396,7 +412,7 @@ export default function CollegeAdminDepartments() {
             <div className={compStyles.inputGroup}>
               <label className={compStyles.label}>المرحلة الدراسية</label>
               <select 
-                className={compStyles.input}
+                className={compStyles.select}
                 value={courseForm.stage_id}
                 onChange={e => setCourseForm({ ...courseForm, stage_id: e.target.value })}
                 required
@@ -423,7 +439,7 @@ export default function CollegeAdminDepartments() {
             <div className={compStyles.inputGroup}>
               <label className={compStyles.label}>الفصل الدراسي / الكورس</label>
                <select 
-                 className={compStyles.input}
+                 className={compStyles.select}
                  value={courseForm.semester}
                  onChange={e => setCourseForm({ ...courseForm, semester: e.target.value })}
                  required
@@ -431,10 +447,6 @@ export default function CollegeAdminDepartments() {
                  <option value="الكورس الأول">الكورس الأول</option>
                  <option value="الكورس الثاني">الكورس الثاني</option>
                </select>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-              <Button type="button" variant="secondary" onClick={() => setIsCourseModalOpen(false)}>إلغاء</Button>
-              <Button type="submit">حفظ المادة</Button>
             </div>
           </form>
         </Modal>

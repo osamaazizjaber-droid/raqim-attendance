@@ -8,7 +8,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
+  padding: 0.7rem 1.25rem 0.55rem 1.25rem; /* Adjusted for Tajawal vertical alignment */
   font-weight: 600;
   font-size: 0.95rem;
   border-radius: var(--radius-md);
@@ -17,6 +17,7 @@
   transition: all var(--transition-fast);
   white-space: nowrap;
   outline: none;
+  line-height: 1.2;
 }
 
 .btnPrimary {
@@ -333,13 +334,14 @@
   background-color: var(--bg-primary);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1rem 0.65rem 1rem; /* Adjusted for Tajawal vertical alignment */
   border-radius: var(--radius-md);
   font-size: 0.95rem;
   transition: all var(--transition-fast);
   outline: none;
   text-align: right;
   width: 100%;
+  line-height: 1.2;
 }
 
 .input:focus {
