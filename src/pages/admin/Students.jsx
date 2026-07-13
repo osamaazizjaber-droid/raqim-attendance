@@ -141,7 +141,7 @@ export default function AdminStudents() {
 
   // تحميل نموذج ملف استيراد الطلاب
   const downloadCSVTemplate = () => {
-    const csvContent = "\uFEFF" + "الاسم الكامل,الرقم الجامعي,القسم,المرحلة,الدراسة\nمحمد علي أحمد,2023/CS/0101,علوم حاسوب,المرحلة الأولى,صباحي\nزينب عبد الرضا,2023/CS/0102,علوم حاسوب,المرحلة الأولى,مسائي";
+    const csvContent = "\uFEFF" + "الاسم الكامل,الرقم الجامعي,القسم,المرحلة,الدراسة,القسط,منصة HEPIC\nمحمد علي أحمد,2023/CS/0101,علوم حاسوب,المرحلة الأولى,صباحي,نعم,نعم\nزينب عبد الرضا,2023/CS/0102,علوم حاسوب,المرحلة الأولى,مسائي,لا,نعم";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -179,6 +179,8 @@ export default function AdminStudents() {
       const deptKey = cleanHeaders.findIndex(h => ['department', 'القسم', 'الكلية'].includes(h));
       const stageKey = cleanHeaders.findIndex(h => ['stage', 'المرحلة'].includes(h));
       const studyTypeKey = cleanHeaders.findIndex(h => ['study_type', 'الدراسة', 'نوع الدراسة', 'صباحي/مسائي', 'الوقت'].includes(h));
+      const feesPaidKey = cleanHeaders.findIndex(h => ['fees_paid', 'القسط', 'دفع القسط', 'حالة القسط', 'القسط (للمسائي)'].includes(h));
+      const hepicKey = cleanHeaders.findIndex(h => ['hepic_registered', 'منصة HEPIC', 'HEPIC', 'تسجيل HEPIC', 'حالة HEPIC'].includes(h));
 
       if (nameKey === -1 || numKey === -1 || deptKey === -1 || stageKey === -1) {
         throw new Error('الملف لا يحتوي على الأعمدة المطلوبة: (الاسم الكامل، الرقم الجامعي، القسم، المرحلة)');
@@ -216,12 +218,30 @@ export default function AdminStudents() {
           }
         }
 
+        let feesPaid = true;
+        if (feesPaidKey !== -1 && values[feesPaidKey]) {
+          const rawFp = values[feesPaidKey].trim().toLowerCase();
+          if (rawFp === 'لا' || rawFp === 'غير مستوفي' || rawFp === 'محجوب' || rawFp === 'false' || rawFp === '0' || rawFp === 'no') {
+            feesPaid = false;
+          }
+        }
+
+        let hepicRegistered = true;
+        if (hepicKey !== -1 && values[hepicKey]) {
+          const rawHr = values[hepicKey].trim().toLowerCase();
+          if (rawHr === 'لا' || rawHr === 'محجوب' || rawHr === 'false' || rawHr === '0' || rawHr === 'no') {
+            hepicRegistered = false;
+          }
+        }
+
         parsedRows.push({
           full_name: values[nameKey] || '',
           student_number: values[numKey] || '',
           department: values[deptKey] || '',
           stage: values[stageKey] || '',
-          study_type: studyType
+          study_type: studyType,
+          fees_paid: feesPaid,
+          hepic_registered: hepicRegistered
         });
       }
 
@@ -320,7 +340,9 @@ export default function AdminStudents() {
           student_number: studentRow.student_number.trim(),
           qr_token: qrToken,
           qr_image_url: null,
-          study_type: studentRow.study_type
+          study_type: studentRow.study_type,
+          fees_paid: studentRow.fees_paid,
+          hepic_registered: studentRow.hepic_registered
         };
 
         studentsToInsert.push(newStudent);
@@ -960,7 +982,7 @@ export default function AdminStudents() {
                 اضغط هنا لرفع ملف <span>Excel/CSV</span> الخاص بالطلاب
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                يجب أن يحتوي الملف على الأعمدة التالية: الاسم الكامل، الرقم الجامعي، القسم، المرحلة
+                يجب أن يحتوي الملف على الأعمدة التالية: الاسم الكامل، الرقم الجامعي، القسم، المرحلة، نوع الدراسة (اختياري)، القسط (اختياري)، منصة HEPIC (اختياري)
               </div>
               <input 
                 type="file" 

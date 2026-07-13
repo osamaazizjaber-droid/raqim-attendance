@@ -217,7 +217,7 @@ export default function CollegeAdminStudents() {
         throw new Error('الملف فارغ أو لا يحتوي على ترويسة الأعمدة');
       }
 
-      // ترويسة الأعمدة: الاسم، الرقم الجامعي، القسم، المرحلة، نوع الدراسة
+      // ترويسة الأعمدة: الاسم، الرقم الجامعي، القسم، المرحلة، نوع الدراسة، القسط، منصة HEPIC
       const rawHeaders = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
       
       const headerMap = {
@@ -244,7 +244,19 @@ export default function CollegeAdminStudents() {
         
         'study_type': 'study_type',
         'الدراسة': 'study_type',
-        'نوع الدراسة': 'study_type'
+        'نوع الدراسة': 'study_type',
+
+        'fees_paid': 'fees_paid',
+        'القسط': 'fees_paid',
+        'دفع القسط': 'fees_paid',
+        'حالة القسط': 'fees_paid',
+        'القسط (للمسائي)': 'fees_paid',
+
+        'hepic_registered': 'hepic_registered',
+        'منصة HEPIC': 'hepic_registered',
+        'HEPIC': 'hepic_registered',
+        'تسجيل HEPIC': 'hepic_registered',
+        'حالة HEPIC': 'hepic_registered'
       };
 
       const headers = rawHeaders.map(h => headerMap[h] || h);
@@ -327,7 +339,11 @@ export default function CollegeAdminStudents() {
           student_number: studNumber,
           qr_token: qrToken,
           qr_image_url: null,
-          study_type: studentRow.study_type === 'مسائي' ? 'مسائي' : 'صباحي'
+          study_type: studentRow.study_type === 'مسائي' ? 'مسائي' : 'صباحي',
+          fees_paid: studentRow.fees_paid !== undefined ? 
+            !(studentRow.fees_paid.trim().toLowerCase() === 'لا' || studentRow.fees_paid.trim().toLowerCase() === 'غير مستوفي' || studentRow.fees_paid.trim().toLowerCase() === 'محجوب' || studentRow.fees_paid.trim().toLowerCase() === 'false' || studentRow.fees_paid.trim().toLowerCase() === '0' || studentRow.fees_paid.trim().toLowerCase() === 'no') : true,
+          hepic_registered: studentRow.hepic_registered !== undefined ? 
+            !(studentRow.hepic_registered.trim().toLowerCase() === 'لا' || studentRow.hepic_registered.trim().toLowerCase() === 'محجوب' || studentRow.hepic_registered.trim().toLowerCase() === 'false' || studentRow.hepic_registered.trim().toLowerCase() === '0' || studentRow.hepic_registered.trim().toLowerCase() === 'no') : true
         });
       });
 
@@ -658,11 +674,11 @@ export default function CollegeAdminStudents() {
 
   // دالة لتحميل نموذج ملف كشوف الطلاب بصيغة CSV تدعم الترميز العربي بترميز UTF-8 BOM
   const downloadTemplate = () => {
-    const csvContent = 'full_name,student_number,department,stage,study_type\n' +
-      'علي أحمد حسين,1001,قسم علوم الحاسوب,المرحلة الأولى,صباحي\n' +
-      'فاطمة عباس محمد,1002,قسم علوم الحاسوب,المرحلة الأولى,مسائي\n' +
-      'أحمد رعد علي,1003,قسم علوم الحاسوب,المرحلة الثانية,صباحي\n' +
-      'زينب جعفر حسن,1004,قسم هندسة البرمجيات,المرحلة الأولى,صباحي\n';
+    const csvContent = 'full_name,student_number,department,stage,study_type,fees_paid,hepic_registered\n' +
+      'علي أحمد حسين,1001,قسم علوم الحاسوب,المرحلة الأولى,صباحي,نعم,نعم\n' +
+      'فاطمة عباس محمد,1002,قسم علوم الحاسوب,المرحلة الأولى,مسائي,لا,نعم\n' +
+      'أحمد رعد علي,1003,قسم علوم الحاسوب,المرحلة الثانية,صباحي,نعم,نعم\n' +
+      'زينب جعفر حسن,1004,قسم هندسة البرمجيات,المرحلة الأولى,صباحي,نعم,لا\n';
     
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -985,11 +1001,11 @@ export default function CollegeAdminStudents() {
                 يجب أن يكون الملف بامتداد <b>.csv</b> ويحتوي على الأعمدة باللغة العربية أو الإنجليزية:
                 <br />
                 <code style={{ direction: 'rtl', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px', margin: '0.5rem 0', fontFamily: 'monospace' }}>
-                  الاسم الكامل، الرقم الجامعي (اختياري)، القسم، المرحلة، نوع الدراسة
+                  الاسم الكامل، الرقم الجامعي (اختياري)، القسم، المرحلة، نوع الدراسة، القسط (للمسائي) (اختياري)، منصة HEPIC (اختياري)
                 </code>
                 أو بالإنجليزية:
                 <code style={{ direction: 'ltr', display: 'block', backgroundColor: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '4px', margin: '0.5rem 0', fontFamily: 'monospace' }}>
-                  full_name, student_number (optional), department, stage, study_type
+                  full_name, student_number (optional), department, stage, study_type, fees_paid, hepic_registered
                 </code>
                 * في حال ترك حقل <b>الرقم الجامعي</b> فارغاً، سيقوم النظام تلقائياً بتوليد رمز رقمي عشوائي فريد ومؤمن لكل طالب.
               </p>
