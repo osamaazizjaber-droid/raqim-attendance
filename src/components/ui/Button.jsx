@@ -8,7 +8,8 @@ export function Button({
   type = 'button', 
   disabled = false,
   className = '',
-  icon: Icon
+  icon: Icon,
+  ...props
 }) {
   const getVariantClass = () => {
     switch(variant) {
@@ -25,6 +26,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled}
       className={`${styles.btn} ${getVariantClass()} ${disabled ? styles.btnDisabled : ''} ${className}`}
+      {...props}
     >
       {Icon && <Icon size={18} />}
       {children}
