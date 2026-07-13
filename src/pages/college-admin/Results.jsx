@@ -353,10 +353,19 @@ export default function CollegeAdminResults() {
         throw new Error('لا توجد سجلات مطابقة للطلاب والمواد في الكلية.');
       }
 
+      // إزالة التكرار من قائمة النتائج قبل الإدخال لتجنب خطأ قاعدة البيانات (ON CONFLICT DO UPDATE command cannot affect row a second time)
+      const uniqueResultsMap = new Map();
+      resultsToInsert.forEach(item => {
+        const key = `${item.student_id}_${item.course_id}_${item.academic_year}`;
+        // نحتفظ بآخر عنصر مكرر
+        uniqueResultsMap.set(key, item);
+      });
+      const deduplicatedResults = Array.from(uniqueResultsMap.values());
+
       // إدخال جماعي مع التحديث في حال التكرار (Upsert)
       const { error: upsertErr } = await supabase
         .from('results')
-        .upsert(resultsToInsert, { onConflict: 'student_id,course_id,academic_year' });
+        .upsert(deduplicatedResults, { onConflict: 'student_id,course_id,academic_year' });
 
       if (upsertErr) throw upsertErr;
 
