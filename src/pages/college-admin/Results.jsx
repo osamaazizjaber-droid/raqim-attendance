@@ -108,12 +108,13 @@ export default function CollegeAdminResults() {
       // نبني استعلام لجلب النتائج
       let query = supabase
         .from('results')
-        .select('*, students!inner(id, full_name, student_number, department_id, stage_id), courses(name)')
+        .select('*, students!inner(id, full_name, student_number, department_id, stage_id), courses!inner(name, semester)')
         .eq('students.college_id', adminDetails.college_id);
 
       if (selectedDept) query = query.eq('students.department_id', selectedDept);
       if (selectedStage) query = query.eq('students.stage_id', selectedStage);
       if (selectedYear) query = query.eq('academic_year', selectedYear);
+      if (selectedSemester) query = query.eq('courses.semester', selectedSemester);
 
       const { data, error } = await query;
       if (error) throw error;
