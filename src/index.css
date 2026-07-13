@@ -1,4 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=Cairo:wght@300;400;500;700;800;900&family=Almarai:wght@300;400;700;800&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Alexandria:wght@300;400;500;600;700;800;900&family=Readex+Pro:wght@300;400;500;600;700&family=Vazirmatn:wght@300;400;500;600;700;800;900&family=Changa:wght@300;400;500;600;700;800&family=Noto+Sans+Arabic:wght@300;400;500;600;700;800;900&display=swap');
+
+@font-face {
+  font-family: 'Thmanyah';
+  src: local('Thmanyah'), local('Thmanyah Regular'), local('Thmanyah-Regular'), local('Thmanyah-Sans');
+  font-display: swap;
+}
 
 :root {
   --bg-primary: #0a0e1a;
@@ -30,6 +36,18 @@
   --transition-slow: 0.4s ease;
 }
 
+:root[data-theme='light'] {
+  --bg-primary: #f9fafb;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f3f4f6;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --border: #e5e7eb;
+  --border-focus: var(--accent);
+  --accent-light: rgba(59, 130, 246, 0.1);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -46,6 +64,7 @@ body {
   overflow-x: hidden;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  transition: background-color var(--transition-normal), color var(--transition-normal), border-color var(--transition-normal);
 }
 
 /* Custom Scrollbar */

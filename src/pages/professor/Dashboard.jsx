@@ -7,7 +7,8 @@ import {
   BookOpen, 
   FileText,
   Clock,
-  UserCheck
+  UserCheck,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useSession } from '../../hooks/useSession';
@@ -63,6 +64,14 @@ export function ProfessorSidebar({ activePage }) {
         >
           <Calendar size={20} />
           <span>سجلات الحضور</span>
+        </Link>
+
+        <Link 
+          to="/settings" 
+          className={`${styles.navLink} ${activePage === 'settings' ? styles.navLinkActive : ''}`}
+        >
+          <Settings size={20} />
+          <span>الإعدادات</span>
         </Link>
 
         <div className={styles.logoutBtn}>

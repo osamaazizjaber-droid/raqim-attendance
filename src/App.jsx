@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { SettingsProvider } from './hooks/useSettings';
+import Settings from './pages/Settings';
 import { useSubscription } from './hooks/useSubscription';
 import { ToastProvider } from './components/ui/Toast';
 import { Skeleton } from './components/ui/Skeleton';
@@ -176,9 +178,10 @@ function LoginRoute({ children }) {
 export default function App() {
   return (
     <ToastProvider>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
+      <SettingsProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
             {/* مسار الدخول الموحد */}
             <Route path="/login" element={
               <LoginRoute>
@@ -260,11 +263,15 @@ export default function App() {
               </ProfessorRoute>
             } />
 
+            {/* مسار الإعدادات المشترك */}
+            <Route path="/settings" element={<Settings />} />
+
             {/* التوجيه التلقائي */}
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      </SettingsProvider>
     </ToastProvider>
   );
 }

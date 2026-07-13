@@ -7,7 +7,8 @@ import {
   LogOut, 
   Activity,
   Calendar,
-  Send
+  Send,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
@@ -61,6 +62,13 @@ export function SuperAdminSidebar({ activePage }) {
         >
           <Send size={20} />
           <span>الإرسال الجماعي (تيليجرام)</span>
+        </Link>
+        <Link 
+          to="/settings" 
+          className={`${styles.navLink} ${activePage === 'settings' ? styles.navLinkActive : ''}`}
+        >
+          <Settings size={20} />
+          <span>الإعدادات</span>
         </Link>
         <button 
           onClick={handleLogout}

@@ -8,7 +8,8 @@ import {
   Activity,
   ArrowRightLeft,
   FileText,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
@@ -93,6 +94,13 @@ export function CollegeAdminSidebar({ activePage }) {
         >
           <FileSpreadsheet size={20} />
           <span>تقارير الحضور</span>
+        </Link>
+        <Link 
+          to="/settings" 
+          className={`${styles.navLink} ${activePage === 'settings' ? styles.navLinkActive : ''}`}
+        >
+          <Settings size={20} />
+          <span>الإعدادات</span>
         </Link>
         <button 
           onClick={handleLogout}
