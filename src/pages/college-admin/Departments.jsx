@@ -202,12 +202,14 @@ export default function CollegeAdminDepartments() {
     const exportData = courses.map(course => ({
       name: course.name,
       stage: course.stages?.name || '-',
-      units: course.units || 1
+      units: course.units || 1,
+      semester: course.semester || 'الكورس الأول'
     }));
     const headers = [
       { key: 'name', label: 'اسم المادة' },
       { key: 'stage', label: 'المرحلة' },
-      { key: 'units', label: 'عدد الوحدات' }
+      { key: 'units', label: 'عدد الوحدات' },
+      { key: 'semester', label: 'الكورس الدراسي' }
     ];
     exportToExcel(exportData, headers, `مواد_قسم_${selectedDept.name}`);
   };
