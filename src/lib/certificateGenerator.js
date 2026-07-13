@@ -278,7 +278,7 @@ export const generateCertificatePDF = async ({
     // A. DRAW OVERALL STATUS TABLE (Left side)
     const statusRowH = 65;
     
-    const drawStatusCell = (x, y, w, h, bg, text, isHeader, textColor = '#000000') => {
+    const drawStatusCell = (x, y, w, h, bg, text, isHeader, textColor = '#000000', customFontSize) => {
       ctx.fillStyle = bg;
       ctx.fillRect(x, y, w, h);
       ctx.strokeStyle = '#000000';
@@ -286,9 +286,11 @@ export const generateCertificatePDF = async ({
       ctx.strokeRect(x, y, w, h);
       
       ctx.fillStyle = textColor;
-      ctx.font = isHeader ? 'bold 22px Tajawal, Arial, sans-serif' : 'bold 24px Tajawal, Arial, sans-serif';
+      ctx.font = customFontSize 
+        ? `bold ${customFontSize}px Tajawal, Arial, sans-serif`
+        : (isHeader ? 'bold 22px Tajawal, Arial, sans-serif' : 'bold 24px Tajawal, Arial, sans-serif');
       ctx.textAlign = 'center';
-      ctx.fillText(text, x + w / 2, y + h / 2 + 8);
+      ctx.fillText(text, x + w / 2, y + h / 2 + (customFontSize ? customFontSize / 3 : 8));
     };
 
     let statusText = 'راسب';
@@ -300,12 +302,9 @@ export const generateCertificatePDF = async ({
       statusText = 'مكمل';
       statusColor = '#D97706';
     }
-    const displayGrade = (statusText === 'مكمل' || statusText === 'راسب') ? '-' : (overallGrade || 'غير متوفر');
     
     drawStatusCell(tableLeftX, tablesStartY, statusBoxW, statusRowH, '#E5E7EB', 'النتيجة', true);
-    drawStatusCell(tableLeftX, tablesStartY + statusRowH, statusBoxW, statusRowH, '#FFFFFF', statusText, false, statusColor);
-    drawStatusCell(tableLeftX, tablesStartY + statusRowH * 2, statusBoxW, statusRowH, '#E5E7EB', 'التقدير', true);
-    drawStatusCell(tableLeftX, tablesStartY + statusRowH * 3, statusBoxW, statusRowH, '#FFFFFF', displayGrade, false, '#000000');
+    drawStatusCell(tableLeftX, tablesStartY + statusRowH, statusBoxW, statusRowH * 3, '#FFFFFF', statusText, false, statusColor, 36);
 
     // B. DRAW MAIN SUBJECTS TABLE (Right side - RTL orientation)
     const subColW = mainTableW * 0.70;
