@@ -35,6 +35,7 @@ export default function CollegeAdminResults() {
   
   // Data States
   const [results, setResults] = useState([]);
+  const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modals state
@@ -119,6 +120,18 @@ export default function CollegeAdminResults() {
       const { data, error } = await query;
       if (error) throw error;
       setResults(data || []);
+
+      // جلب الشهادات لمعرفة من استلم الشهادة
+      let certQuery = supabase
+        .from('certificates')
+        .select('student_id, is_received, academic_year, semester')
+        .eq('semester', selectedSemester);
+      if (selectedYear) certQuery = certQuery.eq('academic_year', selectedYear);
+
+      const { data: certs, error: certErr } = await certQuery;
+      if (!certErr) {
+        setCertificates(certs || []);
+      }
     } catch (err) {
       showToast('خطأ', 'فشل تحميل كشف النتائج', 'danger');
     } finally {
@@ -995,6 +1008,72 @@ export default function CollegeAdminResults() {
     return colors[grade] || 'var(--text-secondary)';
   };
 
+  const getReceiptStatusBadge = (studentRow) => {
+    const cert = certificates.find(
+      c => c.student_id === studentRow.student.id && 
+           c.academic_year === studentRow.academic_year && 
+           c.semester === selectedSemester
+    );
+
+    if (!cert) {
+      return (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.25rem',
+          padding: '0.2rem 0.5rem',
+          borderRadius: '12px',
+          fontSize: '0.75rem',
+          fontWeight: 'bold',
+          color: '#EF4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.2)',
+          whiteSpace: 'nowrap'
+        }}>
+          🔴 لم تُولّد
+        </span>
+      );
+    }
+
+    if (cert.is_received) {
+      return (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.25rem',
+          padding: '0.2rem 0.5rem',
+          borderRadius: '12px',
+          fontSize: '0.75rem',
+          fontWeight: 'bold',
+          color: '#10B981',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+          whiteSpace: 'nowrap'
+        }}>
+          🟢 تم الاستلام
+        </span>
+      );
+    }
+
+    return (
+      <span style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.25rem',
+        padding: '0.2rem 0.5rem',
+        borderRadius: '12px',
+        fontSize: '0.75rem',
+        fontWeight: 'bold',
+        color: '#F59E0B',
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        border: '1px solid rgba(245, 158, 11, 0.2)',
+        whiteSpace: 'nowrap'
+      }}>
+        🟡 لم تُستلم بعد
+      </span>
+    );
+  };
+
   return (
     <div className={styles.adminLayout}>
       <CollegeAdminSidebar activePage="results" />
@@ -1081,6 +1160,7 @@ export default function CollegeAdminResults() {
                   <Th>اسم الطالب</Th>
                   <Th>الرقم الجامعي</Th>
                   <Th>السنة الدراسية</Th>
+                  <Th>حالة الاستلام</Th>
                   {uniqueCourses.map(courseName => (
                     <Th key={courseName}>{courseName}</Th>
                   ))}
@@ -1095,6 +1175,7 @@ export default function CollegeAdminResults() {
                       <Td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{row.student.full_name}</Td>
                       <Td style={{ fontFamily: 'monospace' }}>{row.student.student_number}</Td>
                       <Td>{row.academic_year}</Td>
+                      <Td>{getReceiptStatusBadge(row)}</Td>
                       {uniqueCourses.map(courseName => {
                         const res = row.results.get(courseName);
                         return (

@@ -214,6 +214,7 @@ CREATE TABLE certificates (
     overall_grade text NOT NULL,
     is_passed boolean NOT NULL,
     pdf_url text,
+    is_received boolean DEFAULT false,
     generated_at timestamptz DEFAULT now(),
     generated_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
     UNIQUE(student_id, academic_year, semester)

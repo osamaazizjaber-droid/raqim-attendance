@@ -117,6 +117,18 @@ export default function ResultsLookup() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+
+      // تحديث حالة الاستلام في قاعدة البيانات
+      try {
+        await supabase
+          .from('certificates')
+          .update({ is_received: true })
+          .eq('student_id', studentData.id)
+          .eq('academic_year', academicYear)
+          .eq('semester', semester);
+      } catch (dbErr) {
+        console.warn('Failed to update receipt status in db:', dbErr);
+      }
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء توليد وتحميل الشهادة.');

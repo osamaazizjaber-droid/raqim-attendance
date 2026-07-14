@@ -552,6 +552,16 @@ async function handleDownloadPdfCallback(chatId, data) {
       filename: fileName,
       contentType: 'application/pdf'
     });
+
+    // تحديث حالة الاستلام في قاعدة البيانات
+    try {
+      await supabase
+        .from('certificates')
+        .update({ is_received: true })
+        .eq('id', cert.id);
+    } catch (dbErr) {
+      console.error('Failed to update certificate is_received status in api/bot:', dbErr);
+    }
   } catch (err) {
     console.error('Error in handleDownloadPdfCallback in serverless bot:', err);
     await bot.sendMessage(chatId, '⚠️ حدث خطأ أثناء جلب وتحميل ملف الشهادة. يرجى المحاولة مرة أخرى لاحقاً.');
