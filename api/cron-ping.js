@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  const renderUrl = process.env.RENDER_BOT_URL || 'https://raqim-attendance.onrender.com';
+  const renderUrl = process.env.RENDER_BOT_URL || 'https://raqim-bot.onrender.com';
   
   console.log(`Cron-ping triggered. Pinging Render Bot URL: ${renderUrl}`);
   try {
