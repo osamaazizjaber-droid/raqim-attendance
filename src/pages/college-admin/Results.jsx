@@ -21,6 +21,27 @@ export default function CollegeAdminResults() {
   const { adminDetails, user } = useAuth();
   const fileInputRef = useRef(null);
 
+  // Helper to fetch all rows by paginating (bypasses Supabase 1000 limit)
+  const fetchAllRows = async (queryFn) => {
+    let allData = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const query = queryFn().range(page * pageSize, (page + 1) * pageSize - 1);
+      const { data, error } = await query;
+      if (error) throw error;
+      allData = [...allData, ...(data || [])];
+      if (!data || data.length < pageSize) {
+        hasMore = false;
+      } else {
+        page++;
+      }
+    }
+    return allData;
+  };
+
   // Lists
   const [departments, setDepartments] = useState([]);
   const [stages, setStages] = useState([]);
@@ -108,18 +129,18 @@ export default function CollegeAdminResults() {
       setLoading(true);
       
       // نبني استعلام لجلب النتائج
-      let query = supabase
-        .from('results')
-        .select('*, students!inner(id, full_name, student_number, department_id, stage_id, study_type), courses!inner(name, semester)')
-        .eq('students.college_id', adminDetails.college_id);
+      const data = await fetchAllRows(() => {
+        let q = supabase
+          .from('results')
+          .select('*, students!inner(id, full_name, student_number, department_id, stage_id, study_type), courses!inner(name, semester)')
+          .eq('students.college_id', adminDetails.college_id);
 
-      if (selectedDept) query = query.eq('students.department_id', selectedDept);
-      if (selectedStage) query = query.eq('students.stage_id', selectedStage);
-      if (selectedYear) query = query.eq('academic_year', selectedYear);
-      if (selectedSemester) query = query.eq('courses.semester', selectedSemester);
-
-      const { data, error } = await query;
-      if (error) throw error;
+        if (selectedDept) q = q.eq('students.department_id', selectedDept);
+        if (selectedStage) q = q.eq('students.stage_id', selectedStage);
+        if (selectedYear) q = q.eq('academic_year', selectedYear);
+        if (selectedSemester) q = q.eq('courses.semester', selectedSemester);
+        return q;
+      });
       setResults(data || []);
 
       // جلب الشهادات لمعرفة من استلم الشهادة
@@ -182,12 +203,14 @@ export default function CollegeAdminResults() {
 
       if (!studentDetails || studentDetails.length === 0) return;
 
-      const { data: allStudentResults } = await supabase
-        .from('results')
-        .select('*, courses!inner(name, units, semester)')
-        .in('student_id', studentIds)
-        .eq('academic_year', academicYear)
-        .eq('courses.semester', semester);
+      const allStudentResults = await fetchAllRows(() =>
+        supabase
+          .from('results')
+          .select('*, courses!inner(name, units, semester)')
+          .in('student_id', studentIds)
+          .eq('academic_year', academicYear)
+          .eq('courses.semester', semester)
+      );
 
       if (!allStudentResults || allStudentResults.length === 0) return;
 
@@ -668,14 +691,16 @@ export default function CollegeAdminResults() {
         return;
       }
 
-      const { data: resData, error: rErr } = await supabase
-        .from('results')
-        .select('*, courses!inner(name, units, semester)')
-        .in('student_id', studentIds)
-        .eq('academic_year', selectedYear)
-        .eq('courses.semester', selectedSemester);
+      const resData = await fetchAllRows(() =>
+        supabase
+          .from('results')
+          .select('*, courses!inner(name, units, semester)')
+          .in('student_id', studentIds)
+          .eq('academic_year', selectedYear)
+          .eq('courses.semester', selectedSemester)
+      );
 
-      if (rErr) throw rErr;
+
 
       setStudentsToGen(stds);
       setAllResultsToGen(resData || []);
@@ -925,13 +950,13 @@ export default function CollegeAdminResults() {
 
       // 4. جلب الدرجات الحالية لهؤلاء الطلاب في هذه السنة الدراسية
       const studentIds = studentsData.map(s => s.id);
-      const { data: resultsData, error: resultsErr } = await supabase
-        .from('results')
-        .select('student_id, course_id, score')
-        .in('student_id', studentIds)
-        .eq('academic_year', selectedYear);
-
-      if (resultsErr) throw resultsErr;
+      const resultsData = await fetchAllRows(() =>
+        supabase
+          .from('results')
+          .select('student_id, course_id, score')
+          .in('student_id', studentIds)
+          .eq('academic_year', selectedYear)
+      );
 
       // 5. بناء هيكلية البيانات لملف Excel
       const scoreMap = new Map();
