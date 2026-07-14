@@ -31,6 +31,7 @@ export default function CollegeAdminResults() {
   const [selectedStage, setSelectedStage] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedSemester, setSelectedSemester] = useState('الكورس الأول');
+  const [selectedStudyType, setSelectedStudyType] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   
   // Data States
@@ -109,7 +110,7 @@ export default function CollegeAdminResults() {
       // نبني استعلام لجلب النتائج
       let query = supabase
         .from('results')
-        .select('*, students!inner(id, full_name, student_number, department_id, stage_id), courses!inner(name, semester)')
+        .select('*, students!inner(id, full_name, student_number, department_id, stage_id, study_type), courses!inner(name, semester)')
         .eq('students.college_id', adminDetails.college_id);
 
       if (selectedDept) query = query.eq('students.department_id', selectedDept);
@@ -642,12 +643,18 @@ export default function CollegeAdminResults() {
     
     try {
       // 1. جلب الطلاب
-      const { data: stds, error: sErr } = await supabase
+      let stdsQuery = supabase
         .from('students')
         .select('*, stages(name), departments(name)')
         .eq('department_id', selectedDept)
         .eq('stage_id', selectedStage)
         .eq('college_id', adminDetails.college_id);
+
+      if (selectedStudyType) {
+        stdsQuery = stdsQuery.eq('study_type', selectedStudyType);
+      }
+
+      const { data: stds, error: sErr } = await stdsQuery;
 
       if (sErr) throw sErr;
 
@@ -896,13 +903,18 @@ export default function CollegeAdminResults() {
       }
 
       // 3. جلب جميع الطلاب في هذا القسم والمرحلة
-      const { data: studentsData, error: studentsErr } = await supabase
+      let studentsQuery = supabase
         .from('students')
-        .select('id, full_name, student_number')
+        .select('id, full_name, student_number, study_type')
         .eq('department_id', selectedDept)
         .eq('stage_id', selectedStage)
-        .eq('college_id', adminDetails.college_id)
-        .order('full_name', { ascending: true });
+        .eq('college_id', adminDetails.college_id);
+
+      if (selectedStudyType) {
+        studentsQuery = studentsQuery.eq('study_type', selectedStudyType);
+      }
+
+      const { data: studentsData, error: studentsErr } = await studentsQuery.order('full_name', { ascending: true });
 
       if (studentsErr) throw studentsErr;
 
@@ -967,6 +979,9 @@ export default function CollegeAdminResults() {
 
   // Filter local search list
   const filteredResults = results.filter(r => {
+    if (selectedStudyType && r.students?.study_type !== selectedStudyType) {
+      return false;
+    }
     const term = searchQuery.toLowerCase();
     return (
       r.students?.full_name.toLowerCase().includes(term) ||
@@ -974,6 +989,29 @@ export default function CollegeAdminResults() {
       r.courses?.name.toLowerCase().includes(term)
     );
   });
+
+  // Calculate counts of unique students with results for each study type (before applying selectedStudyType filter)
+  const getStudyTypeCounts = () => {
+    const morningStudents = new Set();
+    const eveningStudents = new Set();
+    
+    results.forEach(r => {
+      if (!r.students) return;
+      if (r.students.study_type === 'صباحي') {
+        morningStudents.add(r.student_id);
+      } else if (r.students.study_type === 'مسائي') {
+        eveningStudents.add(r.student_id);
+      }
+    });
+    
+    return {
+      morning: morningStudents.size,
+      evening: eveningStudents.size,
+      total: morningStudents.size + eveningStudents.size
+    };
+  };
+
+  const counts = getStudyTypeCounts();
 
   // Grouping results by student for Matrix rendering
   const uniqueCourses = Array.from(new Set(filteredResults.map(r => r.courses?.name))).filter(Boolean).sort();
@@ -1128,6 +1166,14 @@ export default function CollegeAdminResults() {
             </select>
           </div>
 
+          <div className={compStyles.inputGroup} style={{ margin: 0, minWidth: '150px' }}>
+            <select className={compStyles.input} value={selectedStudyType} onChange={e => setSelectedStudyType(e.target.value)}>
+              <option value="">الدراسة (الكل - {counts.total})</option>
+              <option value="صباحي">صباحي ({counts.morning})</option>
+              <option value="مسائي">مسائي ({counts.evening})</option>
+            </select>
+          </div>
+
           <div className={compStyles.inputGroup} style={{ margin: 0, flex: 1, minWidth: '200px' }}>
             <input 
               type="text" 
@@ -1160,6 +1206,7 @@ export default function CollegeAdminResults() {
                   <Th>اسم الطالب</Th>
                   <Th>الرقم الجامعي</Th>
                   <Th>السنة الدراسية</Th>
+                  <Th>نوع الدراسة</Th>
                   <Th>حالة الاستلام</Th>
                   {uniqueCourses.map(courseName => (
                     <Th key={courseName}>{courseName}</Th>
@@ -1175,6 +1222,21 @@ export default function CollegeAdminResults() {
                       <Td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{row.student.full_name}</Td>
                       <Td style={{ fontFamily: 'monospace' }}>{row.student.student_number}</Td>
                       <Td>{row.academic_year}</Td>
+                      <Td>
+                        <span style={{
+                          display: 'inline-flex',
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold',
+                          color: row.student.study_type === 'صباحي' ? '#10B981' : '#F59E0B',
+                          backgroundColor: row.student.study_type === 'صباحي' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                          border: row.student.study_type === 'صباحي' ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(245, 158, 11, 0.2)',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {row.student.study_type || 'صباحي'}
+                        </span>
+                      </Td>
                       <Td>{getReceiptStatusBadge(row)}</Td>
                       {uniqueCourses.map(courseName => {
                         const res = row.results.get(courseName);
