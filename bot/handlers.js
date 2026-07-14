@@ -180,16 +180,42 @@ export const handleTextMessage = async (bot, msg) => {
       });
     } else {
       if (!student.qr_image_url) {
-        await bot.sendMessage(chatId, '⚠️ تم العثور على اسمك، ولكن لم يتم توليد بطاقة الحضور الخاصة بك بعد. يرجى مراجعة الإدارة.');
-        return;
+        // جلب البيانات الطازجة مباشرة من قاعدة البيانات في حال كان الكاش غير محدث
+        try {
+          const { data: freshStudent } = await supabase
+            .from('students')
+            .select('qr_image_url, telegram_file_id')
+            .eq('id', student.id)
+            .maybeSingle();
+          if (freshStudent) {
+            student.qr_image_url = freshStudent.qr_image_url;
+            student.telegram_file_id = freshStudent.telegram_file_id;
+            updateStudentInCache(student);
+          }
+        } catch (dbErr) {
+          console.warn('Failed to fetch fresh student data in bot/handlers:', dbErr);
+        }
       }
 
-      // إرسال من رابط سوبابيس لأول مرة
-      const sentMsg = await bot.sendPhoto(chatId, student.qr_image_url, {
-        caption: caption,
-        parse_mode: 'HTML',
-        reply_markup: keyboard
-      });
+      if (student.telegram_file_id) {
+        // إرسال كاش تيليجرام بعد الجلب الطازج
+        await bot.sendPhoto(chatId, student.telegram_file_id, {
+          caption: caption,
+          parse_mode: 'HTML',
+          reply_markup: keyboard
+        });
+      } else {
+        if (!student.qr_image_url) {
+          await bot.sendMessage(chatId, '⚠️ تم العثور على اسمك، ولكن لم يتم توليد بطاقة الحضور الخاصة بك بعد. يرجى مراجعة الإدارة.');
+          return;
+        }
+
+        // إرسال من رابط سوبابيس لأول مرة
+        const sentMsg = await bot.sendPhoto(chatId, student.qr_image_url, {
+          caption: caption,
+          parse_mode: 'HTML',
+          reply_markup: keyboard
+        });
 
       const fileId = sentMsg.photo?.[sentMsg.photo.length - 1]?.file_id;
 
@@ -215,6 +241,7 @@ export const handleTextMessage = async (bot, msg) => {
         console.log(`🧹 تم مسح الصورة من التخزين السحابي للطالب ${student.full_name} بعد استلامها وتخزينها في تيليجرام.`);
       }
     }
+  }
 
   } catch (err) {
     console.error('Error handling telegram message:', err);

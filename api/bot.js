@@ -362,31 +362,58 @@ async function handleTextMessage(chatId, text) {
     });
   } else {
     if (!targetStudent.qr_image_url) {
-      await bot.sendMessage(chatId, '⚠️ تم العثور على اسمك، ولكن لم يتم توليد بطاقة الـ QR الخاصة بك بعد. يرجى التواصل مع إدارة النظام لتوليدها.', {
-        reply_markup: keyboard
-      });
-      return;
+      // جلب البيانات الطازجة مباشرة من قاعدة البيانات في حال كان الكاش غير محدث
+      try {
+        const { data: freshStudent } = await supabase
+          .from('students')
+          .select('qr_image_url, telegram_file_id')
+          .eq('id', targetStudent.id)
+          .maybeSingle();
+        if (freshStudent) {
+          targetStudent.qr_image_url = freshStudent.qr_image_url;
+          targetStudent.telegram_file_id = freshStudent.telegram_file_id;
+          updateStudentInCache(targetStudent);
+        }
+      } catch (dbErr) {
+        console.warn('Failed to fetch fresh student data in api/bot:', dbErr);
+      }
     }
 
-    const sentMsg = await bot.sendPhoto(chatId, targetStudent.qr_image_url, {
-      caption: caption,
-      parse_mode: 'Markdown',
-      reply_markup: keyboard
-    });
+    if (targetStudent.telegram_file_id) {
+      // إرسال كاش تيليجرام بعد الجلب الطازج
+      await bot.sendPhoto(chatId, targetStudent.telegram_file_id, {
+        caption: caption,
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } else {
+      if (!targetStudent.qr_image_url) {
+        await bot.sendMessage(chatId, '⚠️ تم العثور على اسمك، ولكن لم يتم توليد بطاقة الـ QR الخاصة بك بعد. يرجى التواصل مع إدارة النظام لتوليدها.', {
+          reply_markup: keyboard
+        });
+        return;
+      }
 
-    const fileId = sentMsg.photo?.[sentMsg.photo.length - 1]?.file_id;
-    if (fileId) {
-      await supabase
-        .from('students')
-        .update({ telegram_file_id: fileId, qr_image_url: null })
-        .eq('id', targetStudent.id);
+      const sentMsg = await bot.sendPhoto(chatId, targetStudent.qr_image_url, {
+        caption: caption,
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
 
-      targetStudent.telegram_file_id = fileId;
-      targetStudent.qr_image_url = null;
-      updateStudentInCache(targetStudent);
+      const fileId = sentMsg.photo?.[sentMsg.photo.length - 1]?.file_id;
+      if (fileId) {
+        await supabase
+          .from('students')
+          .update({ telegram_file_id: fileId, qr_image_url: null })
+          .eq('id', targetStudent.id);
 
-      const path = `${targetStudent.college_id}/${targetStudent.id}.png`;
-      await supabase.storage.from('qr-cards').remove([path]);
+        targetStudent.telegram_file_id = fileId;
+        targetStudent.qr_image_url = null;
+        updateStudentInCache(targetStudent);
+
+        const path = `${targetStudent.college_id}/${targetStudent.id}.png`;
+        await supabase.storage.from('qr-cards').remove([path]);
+      }
     }
   }
 }
