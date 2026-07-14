@@ -11,6 +11,15 @@ if (dns.setDefaultResultOrder) {
   dns.setDefaultResultOrder('ipv4first');
 }
 
+// معالجة الأخطاء غير المتوقعة لمنع توقف البوت بالكامل (Global exception & rejection handlers)
+process.on('uncaughtException', (err) => {
+  console.error('🔥 [Fatal Error] Uncaught Exception:', err?.stack || err?.message || err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔥 [Fatal Error] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 // تحميل متغيرات البيئة (يبحث في المجلد الحالي والمجلد الأب)
 dotenv.config();
 dotenv.config({ path: '../.env' });
@@ -434,8 +443,14 @@ supabase
       table: 'user_creation_requests',
     },
     async (payload) => {
-      console.log('🔔 استقبلنا طلب إنشاء مستخدم جديد عبر Realtime:', payload.new.email);
-      await processUserCreationRequest(payload.new);
+      try {
+        if (payload?.new?.email) {
+          console.log('🔔 استقبلنا طلب إنشاء مستخدم جديد عبر Realtime:', payload.new.email);
+          await processUserCreationRequest(payload.new);
+        }
+      } catch (err) {
+        console.error('❌ Error handling user_creation_queue realtime callback:', err);
+      }
     }
   )
   .subscribe();
@@ -451,8 +466,14 @@ supabase
       table: 'telegram_resend_requests',
     },
     async (payload) => {
-      console.log('🔔 استقبلنا طلب إعادة إرسال كرت جديد عبر Realtime:', payload.new.id);
-      await processResendRequest(payload.new);
+      try {
+        if (payload?.new?.id) {
+          console.log('🔔 استقبلنا طلب إعادة إرسال كرت جديد عبر Realtime:', payload.new.id);
+          await processResendRequest(payload.new);
+        }
+      } catch (err) {
+        console.error('❌ Error handling bot_resend_queue realtime callback:', err);
+      }
     }
   )
   .subscribe();
@@ -471,8 +492,14 @@ supabase
       table: 'telegram_broadcast_requests',
     },
     async (payload) => {
-      console.log('🔔 استقبلنا طلب إرسال جماعي جديد عبر Realtime:', payload.new.id);
-      await processBroadcastRequest(payload.new);
+      try {
+        if (payload?.new?.id) {
+          console.log('🔔 استقبلنا طلب إرسال جماعي جديد عبر Realtime:', payload.new.id);
+          await processBroadcastRequest(payload.new);
+        }
+      } catch (err) {
+        console.error('❌ Error handling telegram_broadcast_queue realtime callback:', err);
+      }
     }
   )
   .subscribe();
@@ -510,26 +537,30 @@ supabase
       table: 'students',
     },
     async (payload) => {
-      console.log(`🔔 استقبلنا تحديثاً لجدول الطلاب عبر Realtime: ${payload.eventType}`);
-      const { eventType, new: newRecord, old: oldRecord } = payload;
-      
-      if (eventType === 'DELETE') {
-        removeStudentFromCache(oldRecord.id);
-      } else {
-        try {
-          const { data, error } = await supabase
-            .from('students')
-            .select('*, colleges(name, university), departments(name), stages(name)')
-            .eq('id', newRecord.id)
-            .single();
-            
-          if (error) throw error;
-          if (data) {
-            updateStudentInCache(data);
+      try {
+        console.log(`🔔 استقبلنا تحديثاً لجدول الطلاب عبر Realtime: ${payload.eventType}`);
+        const { eventType, new: newRecord, old: oldRecord } = payload;
+        
+        if (eventType === 'DELETE') {
+          if (oldRecord && oldRecord.id) {
+            removeStudentFromCache(oldRecord.id);
           }
-        } catch (err) {
-          console.error('❌ فشل جلب تفاصيل الطالب لتحديث الكاش:', err);
+        } else {
+          if (newRecord && newRecord.id) {
+            const { data, error } = await supabase
+              .from('students')
+              .select('*, colleges(name, university), departments(name), stages(name)')
+              .eq('id', newRecord.id)
+              .single();
+              
+            if (error) throw error;
+            if (data) {
+              updateStudentInCache(data);
+            }
+          }
         }
+      } catch (err) {
+        console.error('❌ فشل جلب تفاصيل الطالب لتحديث الكاش:', err);
       }
     }
   )
@@ -698,26 +729,32 @@ supabase
       table: 'sessions',
     },
     async (payload) => {
-      console.log('🔔 Received UPDATE on sessions:', payload);
-      const newSession = payload.new;
-      const oldSession = payload.old;
+      try {
+        console.log('🔔 Received UPDATE on sessions:', payload);
+        const newSession = payload?.new;
+        const oldSession = payload?.old;
 
-      // نتحقق مما إذا كانت الجلسة قد أغلقت للتو
-      let justClosed = false;
-      if (newSession.ended_at && !newSession.is_open) {
-        if (oldSession && typeof oldSession.is_open === 'boolean') {
-          justClosed = oldSession.is_open === true && newSession.is_open === false;
-        } else {
-          const endedTime = new Date(newSession.ended_at).getTime();
-          const nowTime = Date.now();
-          const diffMs = Math.abs(nowTime - endedTime);
-          justClosed = diffMs < 300000;
+        if (!newSession) return;
+
+        // نتحقق مما إذا كانت الجلسة قد أغلقت للتو
+        let justClosed = false;
+        if (newSession.ended_at && !newSession.is_open) {
+          if (oldSession && typeof oldSession.is_open === 'boolean') {
+            justClosed = oldSession.is_open === true && newSession.is_open === false;
+          } else {
+            const endedTime = new Date(newSession.ended_at).getTime();
+            const nowTime = Date.now();
+            const diffMs = Math.abs(nowTime - endedTime);
+            justClosed = diffMs < 300000;
+          }
         }
-      }
 
-      if (justClosed) {
-        console.log(`📊 جلسة الحضور أغلقت حديثاً: ${newSession.id}. جاري إرسال التقرير للأستاذ...`);
-        await sendSessionReportToProfessor(newSession);
+        if (justClosed) {
+          console.log(`📊 جلسة الحضور أغلقت حديثاً: ${newSession.id}. جاري إرسال التقرير للأستاذ...`);
+          await sendSessionReportToProfessor(newSession);
+        }
+      } catch (err) {
+        console.error('❌ Error handling sessions_update_queue realtime callback:', err);
       }
     }
   )
