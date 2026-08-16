@@ -1,18 +1,30 @@
 import { jsPDF } from 'jspdf';
 
+const imageCache = new Map();
+
 /**
- * Helper: load an Image from a URL, returns an HTMLImageElement.
+ * Helper: load and cache an Image from a URL, returns an HTMLImageElement.
+ * Uses in-memory cache to prevent redundant network requests.
  * Falls back gracefully if CORS or URL is invalid.
  */
-const loadImage = (url) => new Promise((resolve) => {
-  if (!url) return resolve(null);
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.onload = () => resolve(img);
-  img.onerror = () => resolve(null);
-  const cacheBuster = url.includes('?') ? `&_t=${Date.now()}` : `?_t=${Date.now()}`;
-  img.src = url + cacheBuster;
-});
+export const preloadCertificateLogo = (url) => {
+  if (!url) return Promise.resolve(null);
+  if (imageCache.has(url)) return imageCache.get(url);
+
+  const promise = new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+
+  imageCache.set(url, promise);
+  return promise;
+};
+
+const loadImage = preloadCertificateLogo;
+
 
 /**
  * Helper: shield-style emblem — no circle anywhere
@@ -108,11 +120,12 @@ export const generateCertificatePDF = async ({
   department,
   universityLogoUrl = null,
   collegeLogoUrl = null,
+  preloadedLogo = null,
   roundName = 'الكورس الأول',
 }) => {
   // Pre-load logo image (university logo preferred, college logo as fallback)
   const logoUrl = universityLogoUrl || collegeLogoUrl;
-  const logoImg = await loadImage(logoUrl);
+  const logoImg = preloadedLogo !== null ? preloadedLogo : await preloadCertificateLogo(logoUrl);
 
   const W = 1414;
   const H = 2000;
@@ -368,15 +381,15 @@ export const generateCertificatePDF = async ({
   let imgData;
   try {
     drawAll(logoImg);
-    imgData = canvas.toDataURL('image/jpeg', 0.92);
+    imgData = canvas.toDataURL('image/jpeg', 0.85);
   } catch (err) {
     console.warn('Canvas tainted by logo image CORS, retrying without logo:', err);
     ctx.clearRect(0, 0, W, H);
     drawAll(null);
-    imgData = canvas.toDataURL('image/jpeg', 0.92);
+    imgData = canvas.toDataURL('image/jpeg', 0.85);
   }
 
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+  pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
   return pdf.output('blob');
 };

@@ -10,11 +10,25 @@ import { Table, Tr, Th, Td } from '../../components/ui/Table';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
 import { computeOverallGrade, computeIsPassed, computeStudentStatus } from '../../lib/gradeUtils';
-import { generateCertificatePDF } from '../../lib/certificateGenerator';
+import { generateCertificatePDF, preloadCertificateLogo } from '../../lib/certificateGenerator';
 import { CollegeAdminSidebar } from './Dashboard';
 import styles from '../../styles/admin.module.css';
 import compStyles from '../../styles/components.module.css';
 import { useAuth } from '../../hooks/useAuth';
+
+// Helper to run asynchronous tasks in parallel with a controlled concurrency limit
+const runConcurrent = async (items, limit, fn) => {
+  if (!items || items.length === 0) return;
+  let index = 0;
+  const workerCount = Math.min(limit, items.length);
+  const workers = new Array(workerCount).fill(0).map(async () => {
+    while (index < items.length) {
+      const i = index++;
+      await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+};
 
 export default function CollegeAdminResults() {
   const { showToast } = useToast();
@@ -182,7 +196,7 @@ export default function CollegeAdminResults() {
     reader.readAsArrayBuffer(file);
   };
 
-  // توليد تلقائي للشهادات بعد الرفع أو التعديل
+  // توليد تلقائي للشهادات بعد الرفع أو التعديل (بأداء فائق وتوليد متوازي)
   const autoGenerateCertificates = async (studentIds, academicYear, semester, onProgress) => {
     if (!studentIds || studentIds.length === 0) return;
     try {
@@ -195,6 +209,9 @@ export default function CollegeAdminResults() {
       const university = { name: collegeData?.university || 'رقيم حضور' };
       const collegeLogoUrl = collegeData?.logo_url || null;
       const universityLogoUrl = collegeData?.university_logo_url || null;
+
+      // تحميل الشعار لمرة واحدة في الذاكرة ومشاركته لكافة الشهادات
+      const preloadedLogo = await preloadCertificateLogo(universityLogoUrl || collegeLogoUrl);
 
       const { data: studentDetails } = await supabase
         .from('students')
@@ -214,28 +231,18 @@ export default function CollegeAdminResults() {
 
       if (!allStudentResults || allStudentResults.length === 0) return;
 
-      let current = 0;
-      for (const student of studentDetails) {
+      let completed = 0;
+      const certsToUpsert = [];
+      const studentsToDeleteCerts = [];
+
+      // معالجة متوازية (6 مهام متزامنة لتسريع التوليد والرفع أضعافاً مضاعفة)
+      await runConcurrent(studentDetails, 6, async (student) => {
         const studentResults = allStudentResults.filter(r => r.student_id === student.id);
         if (studentResults.length === 0) {
-          // إذا لم يتبقَ نتائج للطالب للكورس الحالي، يتم حذف شهادته من قاعدة البيانات والتخزين
-          await supabase
-            .from('certificates')
-            .delete()
-            .eq('student_id', student.id)
-            .eq('academic_year', academicYear)
-            .eq('semester', semester);
-
-          try {
-            const path = `${student.id}/${academicYear.replace('/', '_')}_${semester.replace(/\s+/g, '_')}.pdf`;
-            await supabase.storage.from('certificates').remove([path]);
-          } catch (e) {
-            console.error('Failed to remove certificate from storage:', e);
-          }
-
-          current++;
-          if (onProgress) onProgress(current, studentDetails.length);
-          continue;
+          studentsToDeleteCerts.push(student.id);
+          completed++;
+          if (onProgress) onProgress(completed, studentDetails.length);
+          return;
         }
 
         const status = computeStudentStatus(studentResults);
@@ -253,6 +260,7 @@ export default function CollegeAdminResults() {
           department: student.departments,
           universityLogoUrl,
           collegeLogoUrl,
+          preloadedLogo,
           roundName: semester
         });
 
@@ -272,20 +280,52 @@ export default function CollegeAdminResults() {
 
         const { data: { publicUrl } } = supabase.storage.from('certificates').getPublicUrl(path);
 
+        certsToUpsert.push({
+          student_id: student.id,
+          academic_year: academicYear,
+          semester: semester,
+          overall_grade: overallGrade,
+          is_passed: isPassed,
+          pdf_url: publicUrl,
+          generated_by: user?.id
+        });
+
+        completed++;
+        if (onProgress) onProgress(completed, studentDetails.length);
+      });
+
+      // حذف شهادات الطلاب الذين لم تعد لديهم نتائج
+      if (studentsToDeleteCerts.length > 0) {
         await supabase
           .from('certificates')
-          .upsert({
-            student_id: student.id,
-            academic_year: academicYear,
-            semester: semester,
-            overall_grade: overallGrade,
-            is_passed: isPassed,
-            pdf_url: publicUrl,
-            generated_by: user?.id
-          }, { onConflict: 'student_id,academic_year,semester' });
+          .delete()
+          .in('student_id', studentsToDeleteCerts)
+          .eq('academic_year', academicYear)
+          .eq('semester', semester);
 
-        current++;
-        if (onProgress) onProgress(current, studentDetails.length);
+        const semCode = semester === 'الكورس الثاني' ? 'sem2' : 'sem1';
+        const pathsToRemove = studentsToDeleteCerts.map(
+          id => `${id}/${academicYear.replace('/', '_')}_${semCode}.pdf`
+        );
+        try {
+          await supabase.storage.from('certificates').remove(pathsToRemove);
+        } catch (e) {
+          console.error('Failed to remove certificates from storage:', e);
+        }
+      }
+
+      // حفظ السجلات في قاعدة البيانات دفعة واحدة (Batch upsert)
+      if (certsToUpsert.length > 0) {
+        for (let i = 0; i < certsToUpsert.length; i += 50) {
+          const chunk = certsToUpsert.slice(i, i + 50);
+          const { error: dbErr } = await supabase
+            .from('certificates')
+            .upsert(chunk, { onConflict: 'student_id,academic_year,semester' });
+          if (dbErr) {
+            console.error('Error upserting certificates chunk:', dbErr);
+            throw dbErr;
+          }
+        }
       }
     } catch (err) {
       console.error('Error auto generating certificates:', err);
@@ -720,22 +760,30 @@ export default function CollegeAdminResults() {
       // جلب بيانات الكلية والجامعة
       const { data: collegeData } = await supabase
         .from('colleges')
-        .select('name, university')
+        .select('name, university, logo_url, university_logo_url')
         .eq('id', adminDetails.college_id)
         .single();
 
       const college = collegeData;
       const university = { name: collegeData?.university || 'رقيم حضور' };
+      const collegeLogoUrl = collegeData?.logo_url || null;
+      const universityLogoUrl = collegeData?.university_logo_url || null;
 
+      // تحميل الشعار لمرة واحدة ومشاركته لجميع شهادات الطلاب
+      const preloadedLogo = await preloadCertificateLogo(universityLogoUrl || collegeLogoUrl);
       const deptName = departments.find(d => d.id === selectedDept);
 
-      for (let i = 0; i < studentsToGen.length; i++) {
-        const student = studentsToGen[i];
+      let completed = 0;
+      const certsToUpsert = [];
+
+      // توليد ورفع متوازي (6 مهام متزامنة)
+      await runConcurrent(studentsToGen, 6, async (student) => {
         const studentResults = allResultsToGen.filter(r => r.student_id === student.id);
 
         if (studentResults.length === 0) {
-          setGenProgress(prev => ({ ...prev, current: i + 1 }));
-          continue;
+          completed++;
+          setGenProgress({ current: completed, total: studentsToGen.length });
+          return;
         }
 
         // 1. احسب التقدير العام والنتيجة
@@ -753,6 +801,9 @@ export default function CollegeAdminResults() {
           university,
           college,
           department: deptName,
+          universityLogoUrl,
+          collegeLogoUrl,
+          preloadedLogo,
           roundName: selectedSemester
         });
 
@@ -771,22 +822,30 @@ export default function CollegeAdminResults() {
         // الحصول على الرابط العام
         const { data: { publicUrl } } = supabase.storage.from('certificates').getPublicUrl(path);
 
-        // 4. احفظ في جدول certificates
-        const { error: dbErr } = await supabase
-          .from('certificates')
-          .upsert({
-            student_id: student.id,
-            academic_year: selectedYear,
-            semester: selectedSemester,
-            overall_grade: overallGrade,
-            is_passed: isPassed,
-            pdf_url: publicUrl,
-            generated_by: user.id
-          }, { onConflict: 'student_id,academic_year,semester' });
+        certsToUpsert.push({
+          student_id: student.id,
+          academic_year: selectedYear,
+          semester: selectedSemester,
+          overall_grade: overallGrade,
+          is_passed: isPassed,
+          pdf_url: publicUrl,
+          generated_by: user.id
+        });
 
-        if (dbErr) throw dbErr;
+        completed++;
+        setGenProgress({ current: completed, total: studentsToGen.length });
+      });
 
-        setGenProgress({ current: i + 1, total: studentsToGen.length });
+      // 4. احفظ في جدول certificates دفعة واحدة (Batch upsert)
+      if (certsToUpsert.length > 0) {
+        for (let i = 0; i < certsToUpsert.length; i += 50) {
+          const chunk = certsToUpsert.slice(i, i + 50);
+          const { error: dbErr } = await supabase
+            .from('certificates')
+            .upsert(chunk, { onConflict: 'student_id,academic_year,semester' });
+
+          if (dbErr) throw dbErr;
+        }
       }
 
       showToast('اكتمل التوليد 📜', `تم توليد ورفع شهادات النتائج لـ ${studentsToGen.length} طالب بنجاح.`, 'success');
@@ -807,20 +866,22 @@ export default function CollegeAdminResults() {
       
       const { data: collegeData } = await supabase
         .from('colleges')
-        .select('name, university')
+        .select('name, university, logo_url, university_logo_url')
         .eq('id', adminDetails.college_id)
         .single();
 
       const college = collegeData;
       const university = { name: collegeData?.university || 'رقيم حضور' };
+      const collegeLogoUrl = collegeData?.logo_url || null;
+      const universityLogoUrl = collegeData?.university_logo_url || null;
 
+      const preloadedLogo = await preloadCertificateLogo(universityLogoUrl || collegeLogoUrl);
       const deptName = departments.find(d => d.id === selectedDept);
 
-      for (let i = 0; i < studentsToGen.length; i++) {
-        const student = studentsToGen[i];
+      // توليد متوازي للملفات وإضافتها إلى الـ ZIP
+      await runConcurrent(studentsToGen, 6, async (student) => {
         const studentResults = allResultsToGen.filter(r => r.student_id === student.id);
-
-        if (studentResults.length === 0) continue;
+        if (studentResults.length === 0) return;
 
         const status = computeStudentStatus(studentResults);
         const isPassed = status === 'ناجح';
@@ -835,12 +896,15 @@ export default function CollegeAdminResults() {
           university,
           college,
           department: deptName,
+          universityLogoUrl,
+          collegeLogoUrl,
+          preloadedLogo,
           roundName: selectedSemester
         });
 
         // إضافة الملف للـ ZIP
         zip.file(`${student.full_name.replace(/\s+/g, '_')}_${student.student_number.replace(/\//g, '_')}_${selectedSemester.replace(/\s+/g, '_')}.pdf`, pdfBlob);
-      }
+      });
 
       // توليد وتحميل ملف الـ ZIP
       const content = await zip.generateAsync({ type: 'blob' });
