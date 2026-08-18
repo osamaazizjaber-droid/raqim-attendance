@@ -364,7 +364,12 @@ export default function CollegeAdminResults() {
 
       const studentsByNameMap = new Map((allStudents || []).map(s => [normalizeArabic(s.full_name), s.id]));
       const studentsByNumberMap = new Map((allStudents || []).map(s => [String(s.student_number || '').trim().toLowerCase(), s.id]));
-      const coursesMap = new Map(allCourses.map(c => [c.name.trim().toLowerCase(), c.id]));
+      
+      const coursesMap = new Map();
+      (allCourses || []).forEach(c => {
+        coursesMap.set(c.name.trim().toLowerCase(), c.id);
+        coursesMap.set(normalizeArabic(c.name), c.id);
+      });
 
       const resultsToInsert = [];
 
@@ -375,6 +380,7 @@ export default function CollegeAdminResults() {
         'full_name', 'الاسم الكامل', 'الاسم', 'اسم الطالب', 'الاسم الثلاثي',
         'semester', 'الكورس', 'الفصل', 'الفصل الدراسي'
       ];
+      const fixedKeysNormalized = fixedKeys.map(k => normalizeArabic(k));
 
       resultsPreview.forEach((row, idx) => {
         const studentName = String(
@@ -414,10 +420,11 @@ export default function CollegeAdminResults() {
 
         // المرور على كافة الأعمدة المتبقية والتي تمثل المواد
         Object.keys(row).forEach(key => {
-          if (fixedKeys.includes(key)) return;
+          if (fixedKeys.includes(key) || fixedKeysNormalized.includes(normalizeArabic(key))) return;
 
           const courseNameClean = key.trim().toLowerCase();
-          const courseId = coursesMap.get(courseNameClean);
+          const normCourseKey = normalizeArabic(key);
+          const courseId = coursesMap.get(courseNameClean) || coursesMap.get(normCourseKey);
 
           if (!courseId) return; // المادة غير مسجلة بالقسم
 
@@ -923,8 +930,13 @@ export default function CollegeAdminResults() {
 
   // دالة لتحميل نموذج ملف كشف الدرجات بصيغة CSV تدعم الترميز العربي بترميز UTF-8 BOM
   const downloadTemplate = async () => {
-    if (!selectedDept || !selectedStage || !selectedYear) {
-      showToast('تنبيه', 'يرجى اختيار القسم والمرحلة والسنة الدراسية أولاً من الفلاتر لتحميل النموذج الخاص بها.', 'warning');
+    const deptId = selectedDept || departments[0]?.id;
+    const stageId = selectedStage || stages[0]?.id;
+    const year = selectedYear || '2024/2025';
+    const sem = selectedSemester || 'الكورس الأول';
+
+    if (!deptId || !stageId) {
+      showToast('تنبيه', 'يرجى اختيار القسم والمرحلة الدراسية من الفلاتر لتحميل النموذج الخاص بها.', 'warning');
       return;
     }
 
@@ -933,30 +945,49 @@ export default function CollegeAdminResults() {
       const { data: coursesData } = await supabase
         .from('courses')
         .select('name')
-        .eq('department_id', selectedDept)
-        .eq('stage_id', selectedStage)
-        .eq('semester', selectedSemester);
+        .eq('department_id', deptId)
+        .eq('stage_id', stageId)
+        .eq('semester', sem)
+        .order('name', { ascending: true });
 
       const courseNames = coursesData?.map(c => c.name) || [];
       if (courseNames.length === 0) {
-        showToast('تنبيه', 'لا توجد مواد مسجلة لهذا القسم وهذه المرحلة في الكورس المحدد.', 'warning');
+        showToast('تنبيه', 'لا توجد مواد مسجلة لهذا القسم والمرحلة في الكورس المحدد. يرجى إضافة أو استيراد المواد أولاً من شاشة "الأقسام والمواد".', 'warning');
         return;
       }
 
+      // جلب عينة من طلاب هذه المرحلة لملء النموذج بأسمائهم وأرقامهم إن وجدوا
+      const { data: stds } = await supabase
+        .from('students')
+        .select('full_name, student_number')
+        .eq('department_id', deptId)
+        .eq('stage_id', stageId)
+        .order('full_name', { ascending: true })
+        .limit(20);
+
       const csvHeaders = ['الرقم الجامعي', 'اسم الطالب', ...courseNames, 'العام الدراسي', 'الكورس'].join(',');
-      const sampleRow = ['1001', 'علي أحمد حسين', ...courseNames.map(() => '85.5'), selectedYear, selectedSemester].join(',');
       
-      const csvContent = `${csvHeaders}\n${sampleRow}\n`;
+      let rowsContent = '';
+      if (stds && stds.length > 0) {
+        rowsContent = stds.map(s => 
+          `"${s.student_number || ''}","${s.full_name || ''}",${courseNames.map(() => '').join(',')},"${year}","${sem}"`
+        ).join('\n');
+      } else {
+        rowsContent = `"1001","علي أحمد حسين",${courseNames.map(() => '85.5').join(',')},"${year}","${sem}"`;
+      }
+      
+      const csvContent = `${csvHeaders}\n${rowsContent}\n`;
       
       const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', 'نموذج_درجات_رقيم.csv');
+      link.setAttribute('download', `نموذج_درجات_${sem.replace(/\s+/g, '_')}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (err) {
       showToast('خطأ', 'فشل تحميل النموذج التجريبي', 'danger');
     }
