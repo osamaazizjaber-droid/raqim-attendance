@@ -342,12 +342,12 @@ export default function CollegeAdminResults() {
       // 1. جلب كافة طلاب وأقسام الكلية للتحقق السريع
       const { data: allStudents } = await supabase
         .from('students')
-        .select('id, full_name, student_number')
+        .select('id, full_name, student_number, department_id, stage_id')
         .eq('college_id', adminDetails.college_id);
 
       const { data: allCourses } = await supabase
         .from('courses')
-        .select('id, name, department_id, semester, departments!inner(college_id)')
+        .select('id, name, department_id, stage_id, semester, departments!inner(college_id)')
         .eq('departments.college_id', adminDetails.college_id);
 
       // دالة لتسوية الحروف العربية لتجنب اختلاف الإملاء (أحمد/احمد، فاطمة/فاطمه، علي/على)
@@ -362,14 +362,62 @@ export default function CollegeAdminResults() {
           .trim();
       };
 
-      const studentsByNameMap = new Map((allStudents || []).map(s => [normalizeArabic(s.full_name), s.id]));
-      const studentsByNumberMap = new Map((allStudents || []).map(s => [String(s.student_number || '').trim().toLowerCase(), s.id]));
+      const studentsByNameMap = new Map((allStudents || []).map(s => [normalizeArabic(s.full_name), s]));
+      const studentsByNumberMap = new Map((allStudents || []).map(s => [String(s.student_number || '').trim().toLowerCase(), s]));
       
-      const coursesMap = new Map();
-      (allCourses || []).forEach(c => {
-        coursesMap.set(c.name.trim().toLowerCase(), c.id);
-        coursesMap.set(normalizeArabic(c.name), c.id);
-      });
+      // دالة ذكية لمطابقة المادة بدقة وتجنب الخلط بين المواد ذات الاسم المتطابق في الكورسين
+      const resolveCourseId = (headerKey, rowSemester, student) => {
+        let cleanKey = headerKey.trim();
+        let explicitSemester = null;
+
+        // تحقق إذا كان اسم العمود يحتوي على تحديد الكورس بين قوسين
+        if (cleanKey.includes('الكورس الأول') || cleanKey.includes('الفصل الأول') || cleanKey.includes('(1)')) {
+          explicitSemester = 'الكورس الأول';
+          cleanKey = cleanKey.replace(/[\(\[\{]?(الكورس الأول|الفصل الأول|1)[\)\]\}]?/g, '').trim();
+        } else if (cleanKey.includes('الكورس الثاني') || cleanKey.includes('الفصل الثاني') || cleanKey.includes('(2)')) {
+          explicitSemester = 'الكورس الثاني';
+          cleanKey = cleanKey.replace(/[\(\[\{]?(الكورس الثاني|الفصل الثاني|2)[\)\]\}]?/g, '').trim();
+        }
+
+        const targetSemester = explicitSemester || rowSemester || selectedSemester || 'الكورس الأول';
+        const normClean = normalizeArabic(cleanKey);
+
+        // 1. مطابقة تامة: الاسم + الكورس + القسم + المرحلة
+        let match = (allCourses || []).find(c => 
+          normalizeArabic(c.name) === normClean && 
+          c.semester === targetSemester &&
+          c.department_id === student?.department_id &&
+          c.stage_id === student?.stage_id
+        );
+        if (match) return match.id;
+
+        // 2. مطابقة: الاسم + الكورس + القسم
+        match = (allCourses || []).find(c => 
+          normalizeArabic(c.name) === normClean && 
+          c.semester === targetSemester &&
+          c.department_id === student?.department_id
+        );
+        if (match) return match.id;
+
+        // 3. مطابقة: الاسم + الكورس
+        match = (allCourses || []).find(c => 
+          normalizeArabic(c.name) === normClean && 
+          c.semester === targetSemester
+        );
+        if (match) return match.id;
+
+        // 4. مطابقة احتياطية: الاسم + القسم + المرحلة
+        match = (allCourses || []).find(c => 
+          normalizeArabic(c.name) === normClean && 
+          c.department_id === student?.department_id &&
+          c.stage_id === student?.stage_id
+        );
+        if (match) return match.id;
+
+        // 5. مطابقة أخيرة بالاسم فقط
+        match = (allCourses || []).find(c => normalizeArabic(c.name) === normClean);
+        return match ? match.id : null;
+      };
 
       const resultsToInsert = [];
 
@@ -408,24 +456,26 @@ export default function CollegeAdminResults() {
           '2024/2025'
         ).trim();
 
-        let studentId = null;
-        if (studentName) {
-          studentId = studentsByNameMap.get(normalizeArabic(studentName));
-        }
-        if (!studentId && studNum) {
-          studentId = studentsByNumberMap.get(studNum);
-        }
+        const student = (studentName ? studentsByNameMap.get(normalizeArabic(studentName)) : null)
+          || (studNum ? studentsByNumberMap.get(studNum) : null);
 
-        if (!studentId) return;
+        if (!student) return;
+        const studentId = student.id;
+
+        const rowSemester = String(
+          row.semester || 
+          row['الكورس'] || 
+          row['الفصل'] || 
+          row['الفصل الدراسي'] || 
+          selectedSemester || 
+          'الكورس الأول'
+        ).trim();
 
         // المرور على كافة الأعمدة المتبقية والتي تمثل المواد
         Object.keys(row).forEach(key => {
           if (fixedKeys.includes(key) || fixedKeysNormalized.includes(normalizeArabic(key))) return;
 
-          const courseNameClean = key.trim().toLowerCase();
-          const normCourseKey = normalizeArabic(key);
-          const courseId = coursesMap.get(courseNameClean) || coursesMap.get(normCourseKey);
-
+          const courseId = resolveCourseId(key, rowSemester, student);
           if (!courseId) return; // المادة غير مسجلة بالقسم
 
           const cellValue = String(row[key] || '').trim();
@@ -1133,8 +1183,32 @@ export default function CollegeAdminResults() {
 
   const counts = getStudyTypeCounts();
 
-  // Grouping results by student for Matrix rendering
-  const uniqueCourses = Array.from(new Set(filteredResults.map(r => r.courses?.name))).filter(Boolean).sort();
+  // Grouping results by student for Matrix rendering (دعم وجود مادتين بنفس الاسم في الكورسين)
+  const uniqueCoursesMap = new Map();
+  filteredResults.forEach(r => {
+    if (!r.courses?.name) return;
+    const courseKey = `${r.courses.name}_${r.courses.semester || ''}`;
+    if (!uniqueCoursesMap.has(courseKey)) {
+      uniqueCoursesMap.set(courseKey, {
+        key: courseKey,
+        name: r.courses.name,
+        semester: r.courses.semester || 'الكورس الأول'
+      });
+    }
+  });
+
+  // فحص تكرار الأسماء لتوضيح الكورس في الترويسة إذا لزم
+  const nameCounts = {};
+  Array.from(uniqueCoursesMap.values()).forEach(c => {
+    nameCounts[c.name] = (nameCounts[c.name] || 0) + 1;
+  });
+
+  const uniqueCourses = Array.from(uniqueCoursesMap.values()).map(c => ({
+    ...c,
+    label: (nameCounts[c.name] > 1 || !selectedSemester) && c.semester
+      ? `${c.name} (${c.semester})`
+      : c.name
+  })).sort((a, b) => a.label.localeCompare(b.label, 'ar'));
   
   const groupedStudentsMap = new Map();
   filteredResults.forEach(r => {
@@ -1144,11 +1218,12 @@ export default function CollegeAdminResults() {
       groupedStudentsMap.set(studentId, {
         student: r.students,
         academic_year: r.academic_year,
-        results: new Map() // courseName -> result record
+        results: new Map() // courseKey -> result record
       });
     }
     if (r.courses?.name) {
-      groupedStudentsMap.get(studentId).results.set(r.courses.name, r);
+      const courseKey = `${r.courses.name}_${r.courses.semester || ''}`;
+      groupedStudentsMap.get(studentId).results.set(courseKey, r);
     }
   });
   
@@ -1328,8 +1403,8 @@ export default function CollegeAdminResults() {
                   <Th>السنة الدراسية</Th>
                   <Th>نوع الدراسة</Th>
                   <Th>حالة الاستلام</Th>
-                  {uniqueCourses.map(courseName => (
-                    <Th key={courseName}>{courseName}</Th>
+                  {uniqueCourses.map(course => (
+                    <Th key={course.key}>{course.label}</Th>
                   ))}
                   <Th>العمليات</Th>
                 </Tr>
@@ -1358,10 +1433,10 @@ export default function CollegeAdminResults() {
                         </span>
                       </Td>
                       <Td>{getReceiptStatusBadge(row)}</Td>
-                      {uniqueCourses.map(courseName => {
-                        const res = row.results.get(courseName);
+                      {uniqueCourses.map(course => {
+                        const res = row.results.get(course.key);
                         return (
-                          <Td key={courseName}>
+                          <Td key={course.key}>
                             {res ? (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                                 <span style={{ fontWeight: 'bold' }}>{res.score}</span>

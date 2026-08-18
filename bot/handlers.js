@@ -304,10 +304,10 @@ export const handleViewResults = async (bot, chatId) => {
       return;
     }
 
-    // جلب درجات الطالب من قاعدة البيانات
+    // جلب درجات الطالب من قاعدة البيانات متضمنة اسم المادة والفصل الدراسي والوحدات
     const { data: results, error: resErr } = await supabase
       .from('results')
-      .select('*, courses(name)')
+      .select('*, courses(name, semester, units)')
       .eq('student_id', student.id)
       .order('created_at', { ascending: true });
 
@@ -340,6 +340,26 @@ export const handleViewResults = async (bot, chatId) => {
     responseText += `🏫 <b>الجامعة والكلية:</b> ${student.colleges?.university || 'جامعة رقيم'} - ${student.colleges?.name || '-'}\n`;
     responseText += `🎓 <b>القسم والمرحلة:</b> ${student.departments?.name || '-'} (${student.stages?.name || 'المرحلة الدراسية'})\n`;
     responseText += `──────────────────\n`;
+
+    // تصنيف وعرض النتائج حسب الكورس الدراسي لتجنب أي لبس في المواد المتطابقة الاسم
+    const sem1Results = results.filter(r => (r.courses?.semester || 'الكورس الأول') === 'الكورس الأول');
+    const sem2Results = results.filter(r => r.courses?.semester === 'الكورس الثاني');
+
+    if (sem1Results.length > 0) {
+      responseText += `\n📘 <b>نتائج الكورس الأول:</b>\n`;
+      sem1Results.forEach(r => {
+        responseText += `▫️ <b>${r.courses?.name || 'مادة'}:</b> ${r.score} (${r.grade_label})\n`;
+      });
+    }
+
+    if (sem2Results.length > 0) {
+      responseText += `\n📙 <b>نتائج الكورس الثاني:</b>\n`;
+      sem2Results.forEach(r => {
+        responseText += `▫️ <b>${r.courses?.name || 'مادة'}:</b> ${r.score} (${r.grade_label})\n`;
+      });
+    }
+
+    responseText += `\n──────────────────\n`;
 
     // تجهيز أزرار تحميل الشهادات المتوفرة للتحميل المباشر داخل البوت
     const inlineButtons = [];
