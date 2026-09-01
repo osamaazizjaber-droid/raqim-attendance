@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { X, CheckCircle, AlertTriangle, AlertCircle, Info } from 'lucide-react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { X, CheckCircle2, AlertTriangle, AlertCircle, Info } from 'lucide-react';
 import styles from '../../styles/components.module.css';
 
 const ToastContext = createContext({
@@ -8,26 +8,58 @@ const ToastContext = createContext({
 
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
-
-  const showToast = useCallback((title, message, type = 'info', duration = 3000) => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, title, message, type }]);
-
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, duration);
-  }, []);
+  const timersRef = useRef(new Map());
 
   const removeToast = useCallback((id) => {
+    if (timersRef.current.has(id)) {
+      clearTimeout(timersRef.current.get(id));
+      timersRef.current.delete(id);
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const showToast = useCallback((title, message, type = 'info', duration = 3000) => {
+    setToasts((prev) => {
+      // 1. منع تكرار نفس الإشعار إذا كان معروضاً حالياً على الشاشة
+      const existing = prev.find((t) => t.title === title && t.message === message);
+      if (existing) {
+        // إعادة تعيين وقت الإشعار الحالي دون مضاعفة البطاقات
+        if (timersRef.current.has(existing.id)) {
+          clearTimeout(timersRef.current.get(existing.id));
+        }
+        const timer = setTimeout(() => {
+          removeToast(existing.id);
+        }, duration);
+        timersRef.current.set(existing.id, timer);
+        return prev;
+      }
+
+      const id = Date.now() + Math.random();
+      const timer = setTimeout(() => {
+        removeToast(id);
+      }, duration);
+      timersRef.current.set(id, timer);
+
+      // 2. تقليص عدد الإشعارات المتزامنة إلى إشعارين فقط كحد أقصى لمنع حجب واجهة المسح
+      const MAX_TOASTS = 2;
+      const nextList = [...prev, { id, title, message, type }];
+      while (nextList.length > MAX_TOASTS) {
+        const removed = nextList.shift();
+        if (timersRef.current.has(removed.id)) {
+          clearTimeout(timersRef.current.get(removed.id));
+          timersRef.current.delete(removed.id);
+        }
+      }
+      return nextList;
+    });
+  }, [removeToast]);
+
   const getIcon = (type) => {
     switch (type) {
-      case 'success': return <CheckCircle style={{ color: 'var(--success)' }} size={20} />;
-      case 'danger': return <AlertCircle style={{ color: 'var(--danger)' }} size={20} />;
-      case 'warning': return <AlertTriangle style={{ color: 'var(--warning)' }} size={20} />;
-      default: return <Info style={{ color: 'var(--accent)' }} size={20} />;
+      case 'success': return <CheckCircle2 size={18} />;
+      case 'danger': return <AlertCircle size={18} />;
+      case 'warning': return <AlertTriangle size={18} />;
+      default: return <Info size={18} />;
     }
   };
 
@@ -43,16 +75,31 @@ export const ToastProvider = ({ children }) => {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className={styles.toastContainer}>
+      <div className={styles.toastContainer} aria-live="polite">
         {toasts.map((toast) => (
-          <div key={toast.id} className={`${styles.toast} ${getToastTypeClass(toast.type)}`}>
-            {getIcon(toast.type)}
+          <div 
+            key={toast.id} 
+            className={`${styles.toast} ${getToastTypeClass(toast.type)}`}
+            onClick={() => removeToast(toast.id)}
+            role="alert"
+          >
+            <div className={styles.toastIconWrapper}>
+              {getIcon(toast.type)}
+            </div>
             <div className={styles.toastContent}>
               {toast.title && <div className={styles.toastTitle}>{toast.title}</div>}
               {toast.message && <div className={styles.toastMessage}>{toast.message}</div>}
             </div>
-            <button className={styles.toastClose} onClick={() => removeToast(toast.id)}>
-              <X size={16} />
+            <button 
+              type="button"
+              className={styles.toastClose} 
+              onClick={(e) => {
+                e.stopPropagation();
+                removeToast(toast.id);
+              }}
+              aria-label="إغلاق التنبيه"
+            >
+              <X size={14} />
             </button>
           </div>
         ))}

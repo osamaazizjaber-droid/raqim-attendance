@@ -78,6 +78,7 @@ export default function CollegeAdminResults() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isCertModalOpen, setIsCertModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [uploadSemester, setUploadSemester] = useState('الكورس الأول');
 
   // Preview / Progress States
   const [resultsPreview, setResultsPreview] = useState([]);
@@ -365,7 +366,7 @@ export default function CollegeAdminResults() {
       const studentsByNameMap = new Map((allStudents || []).map(s => [normalizeArabic(s.full_name), s]));
       const studentsByNumberMap = new Map((allStudents || []).map(s => [String(s.student_number || '').trim().toLowerCase(), s]));
       
-      // دالة ذكية لمطابقة المادة بدقة وتجنب الخلط بين المواد ذات الاسم المتطابق في الكورسين
+      // دالة ذكية لمطابقة المادة بدقة مع العزل التام للكورس الدراسي
       const resolveCourseId = (headerKey, rowSemester, student) => {
         let cleanKey = headerKey.trim();
         let explicitSemester = null;
@@ -379,44 +380,50 @@ export default function CollegeAdminResults() {
           cleanKey = cleanKey.replace(/[\(\[\{]?(الكورس الثاني|الفصل الثاني|2)[\)\]\}]?/g, '').trim();
         }
 
-        const targetSemester = explicitSemester || rowSemester || selectedSemester || 'الكورس الأول';
+        const targetSemester = explicitSemester || rowSemester || uploadSemester || selectedSemester || 'الكورس الأول';
         const normClean = normalizeArabic(cleanKey);
 
-        // 1. مطابقة تامة: الاسم + الكورس + القسم + المرحلة
-        let match = (allCourses || []).find(c => 
+        // حصر البحث حصراً في مواد الكورس المستهدف فقط (عزل تام بين الكورسين لمنع الخلط في المواد المتشابهة)
+        const semesterCourses = (allCourses || []).filter(c => c.semester === targetSemester);
+        if (semesterCourses.length === 0) return null;
+
+        // 1. مطابقة تامة: الاسم + القسم + المرحلة داخل نفس الكورس
+        let match = semesterCourses.find(c => 
           normalizeArabic(c.name) === normClean && 
-          c.semester === targetSemester &&
           c.department_id === student?.department_id &&
           c.stage_id === student?.stage_id
         );
         if (match) return match.id;
 
-        // 2. مطابقة: الاسم + الكورس + القسم
-        match = (allCourses || []).find(c => 
+        // 2. مطابقة: الاسم (أو مع رقم 2 / ملحق) + القسم + المرحلة داخل نفس الكورس
+        match = semesterCourses.find(c => {
+          const normCName = normalizeArabic(c.name);
+          const cNameBase = normCName.replace(/\s*(1|2|الأول|الثاني|الاول)\s*$/g, '').trim();
+          const keyBase = normClean.replace(/\s*(1|2|الأول|الثاني|الاول)\s*$/g, '').trim();
+          return (normCName === normClean || cNameBase === keyBase) &&
+            c.department_id === student?.department_id &&
+            c.stage_id === student?.stage_id;
+        });
+        if (match) return match.id;
+
+        // 3. مطابقة: الاسم + القسم داخل نفس الكورس
+        match = semesterCourses.find(c => 
           normalizeArabic(c.name) === normClean && 
-          c.semester === targetSemester &&
           c.department_id === student?.department_id
         );
         if (match) return match.id;
 
-        // 3. مطابقة: الاسم + الكورس
-        match = (allCourses || []).find(c => 
-          normalizeArabic(c.name) === normClean && 
-          c.semester === targetSemester
-        );
+        // 4. مطابقة بالاسم الأساسي داخل نفس الكورس فقط
+        match = semesterCourses.find(c => {
+          const normCName = normalizeArabic(c.name);
+          const cNameBase = normCName.replace(/\s*(1|2|الأول|الثاني|الاول)\s*$/g, '').trim();
+          const keyBase = normClean.replace(/\s*(1|2|الأول|الثاني|الاول)\s*$/g, '').trim();
+          return normCName === normClean || cNameBase === keyBase;
+        });
         if (match) return match.id;
 
-        // 4. مطابقة احتياطية: الاسم + القسم + المرحلة
-        match = (allCourses || []).find(c => 
-          normalizeArabic(c.name) === normClean && 
-          c.department_id === student?.department_id &&
-          c.stage_id === student?.stage_id
-        );
-        if (match) return match.id;
-
-        // 5. مطابقة أخيرة بالاسم فقط
-        match = (allCourses || []).find(c => normalizeArabic(c.name) === normClean);
-        return match ? match.id : null;
+        // لا يتم أبداً إرجاع مادة من كورس آخر!
+        return null;
       };
 
       const resultsToInsert = [];
@@ -979,11 +986,11 @@ export default function CollegeAdminResults() {
   };
 
   // دالة لتحميل نموذج ملف كشف الدرجات بصيغة CSV تدعم الترميز العربي بترميز UTF-8 BOM
-  const downloadTemplate = async () => {
+  const downloadTemplate = async (overrideSem) => {
     const deptId = selectedDept || departments[0]?.id;
     const stageId = selectedStage || stages[0]?.id;
     const year = selectedYear || '2024/2025';
-    const sem = selectedSemester || 'الكورس الأول';
+    const sem = (typeof overrideSem === 'string' && overrideSem) ? overrideSem : (uploadSemester || selectedSemester || 'الكورس الأول');
 
     if (!deptId || !stageId) {
       showToast('تنبيه', 'يرجى اختيار القسم والمرحلة الدراسية من الفلاتر لتحميل النموذج الخاص بها.', 'warning');
@@ -1002,7 +1009,7 @@ export default function CollegeAdminResults() {
 
       const courseNames = coursesData?.map(c => c.name) || [];
       if (courseNames.length === 0) {
-        showToast('تنبيه', 'لا توجد مواد مسجلة لهذا القسم والمرحلة في الكورس المحدد. يرجى إضافة أو استيراد المواد أولاً من شاشة "الأقسام والمواد".', 'warning');
+        showToast('تنبيه', `لا توجد مواد مسجلة لهذا القسم والمرحلة في ${sem}. يرجى إضافة أو استيراد المواد أولاً من شاشة "الأقسام والمواد".`, 'warning');
         return;
       }
 
@@ -1494,16 +1501,35 @@ export default function CollegeAdminResults() {
               </p>
             </div>
 
-            <div className={compStyles.inputGroup}>
-              <label className={compStyles.label}>اختر ملف كشف الدرجات</label>
-              <input 
-                type="file" 
-                ref={fileInputRef}
-                accept=".xlsx,.csv"
-                className={compStyles.input}
-                onChange={handleFileChange}
-                disabled={isUploading}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div className={compStyles.inputGroup}>
+                <label className={compStyles.label} style={{ fontWeight: 'bold' }}>الكورس الدراسي المستهدف للرفع *</label>
+                <select 
+                  className={compStyles.select}
+                  value={uploadSemester}
+                  onChange={e => setUploadSemester(e.target.value)}
+                  disabled={isUploading}
+                  style={{ border: '2px solid var(--accent)', fontWeight: 'bold' }}
+                >
+                  <option value="الكورس الأول">الكورس الأول</option>
+                  <option value="الكورس الثاني">الكورس الثاني</option>
+                </select>
+                <span style={{ fontSize: '0.75rem', color: 'var(--accent)', marginTop: '0.2rem', display: 'block' }}>
+                  🔒 سيتم حصر رصد المواد (مثل اللغة العربية) في مواد <b>{uploadSemester}</b> فقط لمنع أي تداخل بين الفصلين.
+                </span>
+              </div>
+
+              <div className={compStyles.inputGroup}>
+                <label className={compStyles.label}>اختر ملف كشف الدرجات</label>
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  accept=".xlsx,.csv"
+                  className={compStyles.input}
+                  onChange={handleFileChange}
+                  disabled={isUploading}
+                />
+              </div>
             </div>
 
             {isUploading && (
@@ -1549,14 +1575,14 @@ export default function CollegeAdminResults() {
             )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '1rem', width: '100%' }}>
-              <Button variant="secondary" onClick={downloadTemplate} style={{ marginLeft: 'auto' }}>
+              <Button variant="secondary" onClick={() => downloadTemplate(uploadSemester)} style={{ marginLeft: 'auto' }}>
                 <Download size={16} />
-                <span>تحميل النموذج التجريبي (CSV)</span>
+                <span>تحميل نموذج {uploadSemester} (CSV)</span>
               </Button>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <Button variant="secondary" onClick={() => { setIsUploadModalOpen(false); setResultsPreview([]); }} disabled={isUploading}>إلغاء</Button>
                 <Button onClick={executeUpload} disabled={resultsPreview.length === 0 || isUploading}>
-                  <span>بدء الرفع والاحتساب</span>
+                  <span>بدء الرفع والاحتساب لـ ({uploadSemester})</span>
                 </Button>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Camera, StopCircle, RefreshCw, UserCheck, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -28,6 +28,10 @@ export default function ProfessorScan() {
   // Success overlay state
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [scannedStudent, setScannedStudent] = useState(null);
+
+  // لمنع تكرار مسح نفس البطاقة عدة مرات متتالية وإغراق الشاشة بالإشعارات
+  const lastScanRef = useRef({ token: '', time: 0 });
+  const isProcessingRef = useRef(false);
 
   useEffect(() => {
     fetchSessionDetails();
@@ -74,6 +78,16 @@ export default function ProfessorScan() {
       return;
     }
 
+    // تجنب المعالجة المتزامنة لنفس البطاقة عند بقائها أمام عدسة الكاميرا
+    const now = Date.now();
+    if (isProcessingRef.current) return;
+    if (lastScanRef.current.token === qrToken && (now - lastScanRef.current.time < 3000)) {
+      return;
+    }
+
+    lastScanRef.current = { token: qrToken, time: now };
+    isProcessingRef.current = true;
+
     try {
       const result = await recordAttendance(sessionId, qrToken);
       
@@ -91,6 +105,10 @@ export default function ProfessorScan() {
       }
     } catch (err) {
       showToast('خطأ في البطاقة ❌', err.message || 'فشل معالجة الكود الممسوح', 'danger');
+    } finally {
+      setTimeout(() => {
+        isProcessingRef.current = false;
+      }, 500);
     }
   };
 

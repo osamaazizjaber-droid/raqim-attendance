@@ -228,70 +228,148 @@
 /* 5. رسائل التنبيه العائمة (Toasts) */
 .toastContainer {
   position: fixed;
-  top: 1.5rem;
-  left: 1.5rem;
+  top: max(1rem, env(safe-area-inset-top, 1rem));
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  z-index: 2000;
-  max-width: 350px;
-  width: 90%;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 9999;
+  width: calc(100% - 2rem);
+  max-width: 390px;
+  pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .toastContainer {
+    left: auto;
+    right: 1.5rem;
+    transform: none;
+    align-items: flex-end;
+    max-width: 380px;
+  }
 }
 
 .toast {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.75rem;
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  border: 1px solid var(--border);
-  animation: slideInLeft var(--transition-normal);
-  background-color: var(--bg-secondary);
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(17, 24, 39, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  animation: toastSlideDown 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
 }
 
-@keyframes slideInLeft {
-  from { transform: translateX(-100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+.toast:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 34px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+@keyframes toastSlideDown {
+  from {
+    transform: translateY(-16px) scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.toastIconWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .toastSuccess {
-  border-left: 4px solid var(--success);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.6), 0 0 16px -2px rgba(16, 185, 129, 0.25);
 }
+.toastSuccess .toastIconWrapper {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+}
+
 .toastDanger {
-  border-left: 4px solid var(--danger);
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.6), 0 0 16px -2px rgba(239, 68, 68, 0.25);
 }
+.toastDanger .toastIconWrapper {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+}
+
 .toastWarning {
-  border-left: 4px solid var(--warning);
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.6), 0 0 16px -2px rgba(245, 158, 11, 0.25);
 }
+.toastWarning .toastIconWrapper {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+}
+
 .toastInfo {
-  border-left: 4px solid var(--accent);
+  border-color: rgba(59, 130, 246, 0.35);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.6), 0 0 16px -2px rgba(59, 130, 246, 0.25);
+}
+.toastInfo .toastIconWrapper {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--accent);
 }
 
 .toastContent {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
 .toastTitle {
   font-weight: 700;
-  font-size: 0.95rem;
-  margin-bottom: 0.15rem;
+  font-size: 0.88rem;
+  line-height: 1.3;
   color: var(--text-primary);
 }
 
 .toastMessage {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
   color: var(--text-secondary);
+  word-break: break-word;
 }
 
 .toastClose {
-  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
   border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 0.1rem;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
 }
 .toastClose:hover {
+  background: rgba(255, 255, 255, 0.18);
   color: var(--text-primary);
 }
 

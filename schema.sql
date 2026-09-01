@@ -560,6 +560,40 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- =========================================================================
+-- دالة حذف حساب الأستاذ (RPC - Delete Professor User)
+-- =========================================================================
+CREATE OR REPLACE FUNCTION delete_professor_user(p_professor_id uuid)
+RETURNS void SECURITY DEFINER AS $$
+DECLARE
+  v_user_id uuid;
+  v_college_id uuid;
+BEGIN
+  -- التحقق من صلاحية المنفذ (مدير عام أو مدير كلية)
+  IF NOT (
+    is_super_admin() OR 
+    get_admin_role(auth.uid()) = 'college'
+  ) THEN
+    RAISE EXCEPTION 'غير مصرح لك بإجراء هذه العملية';
+  END IF;
+
+  SELECT user_id, college_id INTO v_user_id, v_college_id FROM professors WHERE id = p_professor_id;
+
+  -- في حال كان المنفذ مدير كلية، يجب أن ينتمي الأستاذ لنفس الكلية
+  IF get_admin_role(auth.uid()) = 'college' AND v_college_id != get_admin_college_id(auth.uid()) THEN
+    RAISE EXCEPTION 'غير مصرح لك بحذف أستاذ تابع لكلية أخرى';
+  END IF;
+
+  -- 1. حذف من auth.users (إن وجد حساب مصادقة مربوط)
+  IF v_user_id IS NOT NULL THEN
+    DELETE FROM auth.users WHERE id = v_user_id;
+  END IF;
+
+  -- 2. حذف سجل الأستاذ من جدول professors (مع cascade للمواد والجلسات والحضور)
+  DELETE FROM professors WHERE id = p_professor_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =========================================================================
 -- Migration: Add logo columns to colleges table
 -- Run this on existing databases that already have the colleges table
 -- =========================================================================

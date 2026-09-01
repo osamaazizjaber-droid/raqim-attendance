@@ -172,6 +172,55 @@ export default function CollegeAdminProfessors() {
     }
   };
 
+  // Delete Professor
+  const handleDeleteProfessor = async (prof) => {
+    if (!window.confirm(`هل أنت متأكد من حذف حساب الأستاذ "${prof.name}"؟ سيتم حذف حسابه وكافة المواد المسندة إليه وجلسات الحضور التابعة له نهائياً!`)) return;
+    try {
+      setLoading(true);
+
+      // Attempt RPC first if available, otherwise direct delete
+      let deleted = false;
+      try {
+        const { error: rpcError } = await supabase.rpc('delete_professor_user', {
+          p_professor_id: prof.id
+        });
+        if (!rpcError) deleted = true;
+      } catch (e) {
+        // Fallback to direct table deletion below
+      }
+
+      if (!deleted) {
+        const { error } = await supabase
+          .from('professors')
+          .delete()
+          .eq('id', prof.id);
+
+        if (error) throw error;
+      }
+
+      showToast('نجاح', 'تم حذف حساب الأستاذ بنجاح', 'success');
+
+      // Update state and clear selection if deleted professor was selected
+      setProfessors(prev => {
+        const updated = prev.filter(p => p.id !== prof.id);
+        if (selectedProf?.id === prof.id) {
+          if (updated.length > 0) {
+            setSelectedProf(updated[0]);
+            fetchAssignedCourses(updated[0].id);
+          } else {
+            setSelectedProf(null);
+            setAssignedCourses([]);
+          }
+        }
+        return updated;
+      });
+    } catch (err) {
+      showToast('خطأ', err.message || 'فشل حذف حساب الأستاذ', 'danger');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Assign course to professor
   const handleAssignCourse = async (e) => {
     e.preventDefault();
@@ -283,6 +332,10 @@ export default function CollegeAdminProfessors() {
                               <Button size="sm" variant="secondary" onClick={() => { setSelectedProf(prof); setRenewDate(prof.subscription_expires_at); setIsRenewModalOpen(true); }}>
                                 <Calendar size={14} />
                                 <span>تجديد</span>
+                              </Button>
+                              <Button size="sm" variant="danger" onClick={() => handleDeleteProfessor(prof)} title="حذف حساب الأستاذ">
+                                <Trash2 size={14} />
+                                <span>حذف</span>
                               </Button>
                             </div>
                           </Td>
