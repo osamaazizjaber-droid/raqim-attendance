@@ -117,7 +117,11 @@ export default function ProfessorScan() {
     
     try {
       await endSession(sessionId);
-      showToast('تم إغلاق الجلسة', 'تم إنهاء تسجيل الحضور وحفظ الكشف بنجاح.', 'success');
+      showToast('تم إغلاق الجلسة', 'تم إنهاء تسجيل الحضور، وجاري إرسال التقرير لتليجرام...', 'success');
+
+      // إشعار فوري مباشر لخدمة البوت كإجراء احتياطي مزدوج لضمان وصول التقرير فوراً للأستاذ
+      fetch(`https://raqim-bot.onrender.com/send-report?sessionId=${sessionId}`).catch(() => {});
+
       navigate('/professor/reports');
     } catch (err) {
       showToast('خطأ', 'فشل إغلاق الجلسة', 'danger');

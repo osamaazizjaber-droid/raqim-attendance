@@ -566,6 +566,62 @@ supabase
   )
   .subscribe();
 
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+async function sendSafeTelegramMessage(chatId, text, options = {}) {
+  try {
+    return await bot.sendMessage(chatId, text, { parse_mode: 'HTML', ...options });
+  } catch (err) {
+    console.warn('⚠️ فشل إرسال رسالة تيليجرام بتنسيق HTML، جاري الإرسال كنص عادي:', err.message);
+    const plainText = text.replace(/<[^>]*>/g, '');
+    return await bot.sendMessage(chatId, plainText, options);
+  }
+}
+
+async function sendChunkedList(chatId, headerTitle, items, emptyMessage) {
+  if (!items || items.length === 0) {
+    if (emptyMessage) {
+      await sendSafeTelegramMessage(chatId, emptyMessage);
+    }
+    return;
+  }
+
+  const MAX_CHUNK_LENGTH = 3500;
+  const chunks = [];
+  let currentChunk = '';
+
+  for (const item of items) {
+    if ((currentChunk + item + '\n').length > MAX_CHUNK_LENGTH) {
+      if (currentChunk.trim()) {
+        chunks.push(currentChunk.trim());
+      }
+      currentChunk = item + '\n';
+    } else {
+      currentChunk += item + '\n';
+    }
+  }
+  if (currentChunk.trim()) {
+    chunks.push(currentChunk.trim());
+  }
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkTitle = chunks.length > 1
+      ? `<b>${headerTitle} (${i + 1}/${chunks.length}):</b>\n\n`
+      : `<b>${headerTitle}:</b>\n\n`;
+
+    await sendSafeTelegramMessage(chatId, chunkTitle + chunks[i]);
+    if (i < chunks.length - 1) {
+      await new Promise(r => setTimeout(r, 250));
+    }
+  }
+}
+
 /**
  * وظيفة لتوليد وإرسال تقرير تفصيلي للأستاذ عبر تيليجرام فور انتهاء الجلسة.
  */
@@ -637,86 +693,79 @@ async function sendSessionReportToProfessor(session) {
     const presentMap = new Map(attendance?.map(a => [a.student_id, a.scanned_at]) || []);
     const repeatSet = new Set(repeatStudentIds);
 
-    let presentCount = 0;
-    let absentCount = 0;
-    let presentListText = '';
-    let absentListText = '';
+    const presentItems = [];
+    const absentItems = [];
 
     (allStudents || []).forEach((student) => {
       const scannedAt = presentMap.get(student.id);
       const suffix = repeatSet.has(student.id) ? ' (إعادة)' : '';
+      const safeName = escapeHtml(student.full_name) + suffix;
+      const safeNum = escapeHtml(student.student_number);
 
       if (scannedAt) {
-        presentCount++;
         const timeStr = new Date(scannedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-        presentListText += `✅ ${presentCount}. ${student.full_name}${suffix} (${student.student_number}) [${timeStr}]\n`;
+        presentItems.push(`✅ ${presentItems.length + 1}. <b>${safeName}</b> (<code>${safeNum}</code>) [${timeStr}]`);
       } else {
-        absentCount++;
-        absentListText += `❌ ${absentCount}. ${student.full_name}${suffix} (${student.student_number})\n`;
+        absentItems.push(`❌ ${absentItems.length + 1}. ${safeName} (<code>${safeNum}</code>)`);
       }
     });
 
     const totalEnrolled = (allStudents || []).length;
+    const presentCount = presentItems.length;
+    const absentCount = absentItems.length;
     const attendanceRatio = totalEnrolled > 0 ? Math.round((presentCount / totalEnrolled) * 100) : 0;
     const formattedDate = new Date(session.started_at).toLocaleDateString('ar-EG');
     const startTimeStr = new Date(session.started_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
     const endTimeStr = session.ended_at ? new Date(session.ended_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '-';
 
-    // التقرير الملخص وقائمة الغيابات
+    // رسالة الملخص الرئيسية مع الإحصائيات
     const summaryMessage = `
-📊 *تقرير حضور المحاضرة الرسمي — رقيم*
+📊 <b>تقرير حضور المحاضرة الرسمي — رقيم</b>
 
-• *الأستاذ:* د. ${professor.name}
-• *المادة:* ${course.name}
-• *القسم:* ${course.departments?.name || '-'}
-• *المرحلة:* ${course.stages?.name || '-'}
-• *نوع الدراسة:* ${session.study_type || 'صباحي'}
-• *التاريخ:* ${formattedDate}
-• *وقت البدء:* ${startTimeStr}
-• *وقت الانتهاء:* ${endTimeStr}
+• <b>الأستاذ:</b> د. ${escapeHtml(professor.name)}
+• <b>المادة:</b> ${escapeHtml(course.name)}
+• <b>القسم:</b> ${escapeHtml(course.departments?.name || '-')}
+• <b>المرحلة:</b> ${escapeHtml(course.stages?.name || '-')}
+• <b>نوع الدراسة:</b> ${escapeHtml(session.study_type || 'صباحي')}
+• <b>التاريخ:</b> ${formattedDate}
+• <b>وقت البدء:</b> ${startTimeStr}
+• <b>وقت الانتهاء:</b> ${endTimeStr}
 
-📈 *إحصائيات الجلسة:*
-• الحاضرين: *${presentCount}* طلاب
-• الغائبين: *${absentCount}* طلاب
-• الإجمالي الكلي للشعبة: *${totalEnrolled}*
-• نسبة حضور الشعبة: *${attendanceRatio}%*
+📈 <b>إحصائيات الجلسة:</b>
+• الحاضرين: <b>${presentCount}</b> طلاب
+• الغائبين: <b>${absentCount}</b> طلاب
+• الإجمالي الكلي للشعبة: <b>${totalEnrolled}</b>
+• نسبة حضور الشعبة: <b>${attendanceRatio}%</b>
+`.trim();
 
-------------------------------------------
+    // 1. إرسال الملخص
+    await sendSafeTelegramMessage(professor.telegram_chat_id, summaryMessage);
 
-*🚫 قائمة الطلاب الغائبين (${absentCount}):*
-${absentListText || 'لا يوجد غيابات (الحضور مكتمل) 🎉'}
-`;
+    // 2. إرسال قائمة الغائبين مجزأة لمنع تجاوز الحد الأقصى لطول رسالة تيليجرام
+    await sendChunkedList(
+      professor.telegram_chat_id,
+      `🚫 قائمة الطلاب الغائبين (${absentCount})`,
+      absentItems,
+      '<b>🚫 قائمة الطلاب الغائبين (0):</b>\nلا يوجد غيابات (الحضور مكتمل) 🎉'
+    );
 
-    // إرسال الرسالة الأولى (الملخص والغائبين)
-    await bot.sendMessage(professor.telegram_chat_id, summaryMessage, { parse_mode: 'Markdown' });
-
-    // إرسال الرسالة الثانية (الحاضرين)
-    if (presentCount > 0) {
-      const presentMessageHeader = `*🟢 قائمة الطلاب الحاضرين (${presentCount}):*\n`;
-      let currentMsg = presentMessageHeader;
-
-      const lines = presentListText.split('\n');
-      for (const line of lines) {
-        if ((currentMsg + line + '\n').length > 4000) {
-          await bot.sendMessage(professor.telegram_chat_id, currentMsg, { parse_mode: 'Markdown' });
-          currentMsg = '';
-        }
-        currentMsg += line + '\n';
-      }
-
-      if (currentMsg.trim() !== '') {
-        await bot.sendMessage(professor.telegram_chat_id, currentMsg, { parse_mode: 'Markdown' });
-      }
-    } else {
-      await bot.sendMessage(professor.telegram_chat_id, '*🟢 قائمة الطلاب الحاضرين (0):*\nلا يوجد حضور في هذه الجلسة ❌', { parse_mode: 'Markdown' });
-    }
+    // 3. إرسال قائمة الحاضرين مجزأة
+    await sendChunkedList(
+      professor.telegram_chat_id,
+      `🟢 قائمة الطلاب الحاضرين (${presentCount})`,
+      presentItems,
+      '<b>🟢 قائمة الطلاب الحاضرين (0):</b>\nلا يوجد حضور مسجل في هذه الجلسة ❌'
+    );
 
     console.log(`✉️ تم إرسال تقرير الجلسة ${session.id} للأستاذ ${professor.name} عبر تيليجرام بنجاح.`);
-
   } catch (err) {
     console.error(`❌ فشل توليد وإرسال تقرير الجلسة ${session.id} للأستاذ:`, err);
+    throw err;
   }
 }
+
+// تتبع الجلسات التي تم إرسال تقريرها لمنع التكرار
+const sentSessionReports = new Set();
 
 // الاشتراك في تعديلات جدول الجلسات لإرسال التقارير عند الإغلاق
 supabase
@@ -736,6 +785,10 @@ supabase
 
         if (!newSession) return;
 
+        if (sentSessionReports.has(newSession.id)) {
+          return;
+        }
+
         // نتحقق مما إذا كانت الجلسة قد أغلقت للتو
         let justClosed = false;
         if (newSession.ended_at && !newSession.is_open) {
@@ -745,11 +798,12 @@ supabase
             const endedTime = new Date(newSession.ended_at).getTime();
             const nowTime = Date.now();
             const diffMs = Math.abs(nowTime - endedTime);
-            justClosed = diffMs < 300000;
+            justClosed = diffMs < 600000;
           }
         }
 
         if (justClosed) {
+          sentSessionReports.add(newSession.id);
           console.log(`📊 جلسة الحضور أغلقت حديثاً: ${newSession.id}. جاري إرسال التقرير للأستاذ...`);
           await sendSessionReportToProfessor(newSession);
         }
@@ -760,9 +814,56 @@ supabase
   )
   .subscribe();
 
-// خادم ويب بسيط لإبقاء خدمة البوت قيد العمل
+// خادم ويب بسيط لإبقاء خدمة البوت قيد العمل واستقبال طلبات إرسال التقارير الفورية
 const port = process.env.PORT || 3000;
-http.createServer((req, res) => {
+http.createServer(async (req, res) => {
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+
+  if (parsedUrl.pathname === '/send-report') {
+    const sessionId = parsedUrl.searchParams.get('sessionId');
+    if (!sessionId) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: 'Missing sessionId query parameter' }));
+      return;
+    }
+
+    try {
+      const { data: sessionData, error: sErr } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+
+      if (sErr || !sessionData) {
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Session not found' }));
+        return;
+      }
+
+      await sendSessionReportToProfessor(sessionData);
+      sentSessionReports.add(sessionData.id);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: true, message: 'تم إرسال التقرير بنجاح' }));
+      return;
+    } catch (apiErr) {
+      console.error('Error handling /send-report API:', apiErr);
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: apiErr.message || 'Internal error' }));
+      return;
+    }
+  }
+
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end('🤖 بوت رقيم لتيليجرام يعمل بنجاح في الخلفية!');
 }).listen(port, () => {

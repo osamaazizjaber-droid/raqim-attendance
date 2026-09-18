@@ -686,20 +686,38 @@ async function sendSessionReportToProfessor(session) {
 
     const { data: course, error: courseErr } = await supabase
       .from('courses')
-      .select('name, department_id, stage_id, departments(name), stages(name)')
+      .select('name, department_id, stage_id, departments(name, college_id), stages(name)')
       .eq('id', session.course_id)
       .single();
 
     if (courseErr) throw courseErr;
 
-    const { data: allStudents, error: studErr } = await supabase
-      .from('students')
-      .select('id, full_name, student_number')
-      .eq('department_id', course.department_id)
-      .eq('stage_id', course.stage_id)
-      .eq('study_type', session.study_type || 'صباحي')
-      .order('full_name', { ascending: true });
+    const now = new Date();
+    const currentYear = now.getMonth() >= 8
+      ? `${now.getFullYear()}/${now.getFullYear() + 1}`
+      : `${now.getFullYear() - 1}/${now.getFullYear()}`;
 
+    const { data: studentCoursesData } = await supabase
+      .from('student_courses')
+      .select('student_id, type')
+      .eq('course_id', session.course_id)
+      .eq('academic_year', currentYear);
+
+    const repeatStudentIds = (studentCoursesData || []).filter(sc => sc.type === 'repeat').map(sc => sc.student_id);
+
+    let query = supabase
+      .from('students')
+      .select('id, full_name, student_number');
+
+    if (repeatStudentIds.length > 0) {
+      query = query.or(`and(department_id.eq.${course.department_id},stage_id.eq.${course.stage_id},study_type.eq.${session.study_type || 'صباحي'}),id.in.(${repeatStudentIds.join(',')})`);
+    } else {
+      query = query.eq('department_id', course.department_id)
+        .eq('stage_id', course.stage_id)
+        .eq('study_type', session.study_type || 'صباحي');
+    }
+
+    const { data: allStudents, error: studErr } = await query.order('full_name', { ascending: true });
     if (studErr) throw studErr;
 
     const { data: attendance, error: attErr } = await supabase
@@ -710,72 +728,94 @@ async function sendSessionReportToProfessor(session) {
     if (attErr) throw attErr;
 
     const presentMap = new Map(attendance?.map(a => [a.student_id, a.scanned_at]) || []);
-    let presentCount = 0;
-    let absentCount = 0;
-    let presentListText = '';
-    let absentListText = '';
+    const repeatSet = new Set(repeatStudentIds);
 
-    (allStudents || []).forEach((student, index) => {
+    const presentItems = [];
+    const absentItems = [];
+
+    const escape = (str) => {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    };
+
+    (allStudents || []).forEach((student) => {
       const scannedAt = presentMap.get(student.id);
+      const suffix = repeatSet.has(student.id) ? ' (إعادة)' : '';
+      const safeName = escape(student.full_name) + suffix;
+      const safeNum = escape(student.student_number);
+
       if (scannedAt) {
-        presentCount++;
         const timeStr = new Date(scannedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-        presentListText += `✅ ${presentCount}. ${student.full_name} (${student.student_number}) [${timeStr}]\n`;
+        presentItems.push(`✅ ${presentItems.length + 1}. <b>${safeName}</b> (<code>${safeNum}</code>) [${timeStr}]`);
       } else {
-        absentCount++;
-        absentListText += `❌ ${absentCount}. ${student.full_name} (${student.student_number})\n`;
+        absentItems.push(`❌ ${absentItems.length + 1}. ${safeName} (<code>${safeNum}</code>)`);
       }
     });
 
     const totalEnrolled = (allStudents || []).length;
+    const presentCount = presentItems.length;
+    const absentCount = absentItems.length;
     const attendanceRatio = totalEnrolled > 0 ? Math.round((presentCount / totalEnrolled) * 100) : 0;
     const formattedDate = new Date(session.started_at).toLocaleDateString('ar-EG');
     const startTimeStr = new Date(session.started_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
     const endTimeStr = session.ended_at ? new Date(session.ended_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '-';
 
     const summaryMessage = `
-📊 *تقرير حضور المحاضرة الرسمي — رقيم*
+📊 <b>تقرير حضور المحاضرة الرسمي — رقيم</b>
 
-• *الأستاذ:* د. ${professor.name}
-• *المادة:* ${course.name}
-• *القسم والكلية:* ${course.departments?.name || '-'}
-• *المرحلة:* ${course.stages?.name || '-'}
-• *نوع الدراسة:* ${session.study_type || 'صباحي'}
-• *التاريخ:* ${formattedDate}
-• *وقت البدء:* ${startTimeStr}
-• *وقت الانتهاء:* ${endTimeStr}
+• <b>الأستاذ:</b> د. ${escape(professor.name)}
+• <b>المادة:</b> ${escape(course.name)}
+• <b>القسم:</b> ${escape(course.departments?.name || '-')}
+• <b>المرحلة:</b> ${escape(course.stages?.name || '-')}
+• <b>نوع الدراسة:</b> ${escape(session.study_type || 'صباحي')}
+• <b>التاريخ:</b> ${formattedDate}
+• <b>وقت البدء:</b> ${startTimeStr}
+• <b>وقت الانتهاء:</b> ${endTimeStr}
 
-📈 *إحصائيات الجلسة:*
-• الحاضرين: *${presentCount}* طلاب
-• الغائبين: *${absentCount}* طلاب
-• الإجمالي الكلي للشعبة: *${totalEnrolled}*
-• نسبة حضور الشعبة: *${attendanceRatio}%*
+📈 <b>إحصائيات الجلسة:</b>
+• الحاضرين: <b>${presentCount}</b> طلاب
+• الغائبين: <b>${absentCount}</b> طلاب
+• الإجمالي الكلي للشعبة: <b>${totalEnrolled}</b>
+• نسبة حضور الشعبة: <b>${attendanceRatio}%</b>
+`.trim();
 
-------------------------------------------
+    const sendSafe = async (text) => {
+      try {
+        await bot.sendMessage(professor.telegram_chat_id, text, { parse_mode: 'HTML' });
+      } catch (err) {
+        const plain = text.replace(/<[^>]*>/g, '');
+        await bot.sendMessage(professor.telegram_chat_id, plain);
+      }
+    };
 
-*🚫 قائمة الطلاب الغائبين (${absentCount}):*
-${absentListText || 'لا يوجد غيابات (الحضور مكتمل) 🎉'}
-`;
-
-    await bot.sendMessage(professor.telegram_chat_id, summaryMessage, { parse_mode: 'Markdown' });
-
-    if (presentCount > 0) {
-      const presentMessageHeader = `*🟢 قائمة الطلاب الحاضرين (${presentCount}):*\n`;
-      let currentMsg = presentMessageHeader;
-      const lines = presentListText.split('\n');
-      for (const line of lines) {
-        if ((currentMsg + line + '\n').length > 4000) {
-          await bot.sendMessage(professor.telegram_chat_id, currentMsg, { parse_mode: 'Markdown' });
-          currentMsg = '';
+    const sendChunks = async (title, list, emptyMsg) => {
+      if (!list || list.length === 0) {
+        if (emptyMsg) await sendSafe(emptyMsg);
+        return;
+      }
+      const chunks = [];
+      let cur = '';
+      for (const item of list) {
+        if ((cur + item + '\n').length > 3500) {
+          if (cur.trim()) chunks.push(cur.trim());
+          cur = item + '\n';
+        } else {
+          cur += item + '\n';
         }
-        currentMsg += line + '\n';
       }
-      if (currentMsg.trim() !== '') {
-        await bot.sendMessage(professor.telegram_chat_id, currentMsg, { parse_mode: 'Markdown' });
+      if (cur.trim()) chunks.push(cur.trim());
+
+      for (let i = 0; i < chunks.length; i++) {
+        const header = chunks.length > 1 ? `<b>${title} (${i + 1}/${chunks.length}):</b>\n\n` : `<b>${title}:</b>\n\n`;
+        await sendSafe(header + chunks[i]);
+        if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 250));
       }
-    } else {
-      await bot.sendMessage(professor.telegram_chat_id, '*🟢 قائمة الطلاب الحاضرين (0):*\nلا يوجد حضور في هذه الجلسة ❌', { parse_mode: 'Markdown' });
-    }
+    };
+
+    await sendSafe(summaryMessage);
+    await sendChunks(`🚫 قائمة الطلاب الغائبين (${absentCount})`, absentItems, '<b>🚫 قائمة الطلاب الغائبين (0):</b>\nلا يوجد غيابات (الحضور مكتمل) 🎉');
+    await sendChunks(`🟢 قائمة الطلاب الحاضرين (${presentCount})`, presentItems, '<b>🟢 قائمة الطلاب الحاضرين (0):</b>\nلا يوجد حضور مسجل في هذه الجلسة ❌');
+
   } catch (err) {
     console.error('Error sending session report:', err);
   }

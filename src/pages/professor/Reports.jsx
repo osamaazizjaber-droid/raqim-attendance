@@ -7,7 +7,7 @@ import { Modal } from '../../components/ui/Modal';
 import { ReportTable } from '../../components/reports/ReportTable';
 import { ExportButtons } from '../../components/reports/ExportButtons';
 import { ProfessorSidebar } from './Dashboard';
-import { Eye, BookOpen, Calendar, Search } from 'lucide-react';
+import { Eye, BookOpen, Calendar, Search, Send } from 'lucide-react';
 import styles from '../../styles/professor.module.css';
 import compStyles from '../../styles/components.module.css';
 
@@ -20,6 +20,7 @@ export default function ProfessorReports() {
   const [assignedCourses, setAssignedCourses] = useState([]);
   const [stages, setStages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sendingTelegramId, setSendingTelegramId] = useState(null);
 
   // Filters
   const [selectedCourseId, setSelectedCourseId] = useState('');
@@ -198,6 +199,35 @@ export default function ProfessorReports() {
     }
   };
 
+  const handleSendTelegramReport = async (session) => {
+    if (!professor?.telegram_chat_id) {
+      showToast(
+        'تنبيه الربط ⚠️',
+        'لم تقم بربط حسابك ببوت التيليجرام بعد. يرجى إرسال بريدك الإلكتروني إلى البوت (@raqim26_bot) لتفعيله وتلقي التقارير تلقائياً.',
+        'warning'
+      );
+      return;
+    }
+
+    setSendingTelegramId(session.id);
+    try {
+      showToast('جاري الإرسال ⏳', 'جاري تجهيز وإرسال التقرير التفصيلي إلى تليجرام...', 'info');
+      const res = await fetch(`https://raqim-bot.onrender.com/send-report?sessionId=${session.id}`);
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        showToast('تم الإرسال بنجاح ✈️', 'تم إرسال تقرير الحضور التفصيلي وقوائم الطلاب إلى حسابك في تليجرام.', 'success');
+      } else {
+        throw new Error(data.error || 'فشل إرسال التقرير');
+      }
+    } catch (err) {
+      console.error('Error sending telegram report:', err);
+      showToast('خطأ في الإرسال ❌', err.message || 'تعذر الوصول لخادم البوت، يرجى المحاولة لاحقاً.', 'danger');
+    } finally {
+      setSendingTelegramId(null);
+    }
+  };
+
   // إعداد الأعمدة للتصدير
   const sessionHeaders = [
     { key: 'date', label: 'التاريخ' },
@@ -312,16 +342,27 @@ export default function ProfessorReports() {
               { key: 'ratio', label: 'حضور / كلي', render: (_, row) => `${row.present_count} / ${row.enrolled_count}` },
               { 
                 key: 'actions', 
-                label: 'التفاصيل الكشف', 
+                label: 'الإجراءات', 
                 render: (_, row) => (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => handleViewSessionDetails(row)}
-                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
-                    icon={Eye}
-                  >
-                    تفاصيل الكشف
-                  </Button>
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleViewSessionDetails(row)}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                      icon={Eye}
+                    >
+                      تفاصيل الكشف
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleSendTelegramReport(row)}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                      disabled={sendingTelegramId === row.id}
+                      icon={Send}
+                    >
+                      {sendingTelegramId === row.id ? 'إرسال...' : 'تليجرام'}
+                    </Button>
+                  </div>
                 )
               }
             ]}
@@ -348,15 +389,26 @@ export default function ProfessorReports() {
               <div><strong>حالة الحضور:</strong> {selectedSession.present_count} حاضرين من أصل {selectedSession.enrolled_count} طالب</div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <h4 style={{ fontWeight: 'bold' }}>كشف أسماء الطلاب وحالة حضورهم</h4>
-              <ExportButtons 
-                title={`كشف حضور مادة: ${selectedSession.courses?.name} - قسم: ${selectedSession.courses?.departments?.name} (${new Date(selectedSession.started_at).toLocaleDateString('ar-EG')})`}
-                headers={detailHeaders}
-                data={attendanceDetails}
-                fileName={`حضور_${selectedSession.courses?.name}`}
-                disabled={attendanceDetails.length === 0}
-              />
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <Button
+                  variant="secondary"
+                  onClick={() => handleSendTelegramReport(selectedSession)}
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
+                  disabled={sendingTelegramId === selectedSession.id}
+                  icon={Send}
+                >
+                  {sendingTelegramId === selectedSession.id ? 'جاري الإرسال...' : '📲 إرسال لتليجرام'}
+                </Button>
+                <ExportButtons 
+                  title={`كشف حضور مادة: ${selectedSession.courses?.name} - قسم: ${selectedSession.courses?.departments?.name} (${new Date(selectedSession.started_at).toLocaleDateString('ar-EG')})`}
+                  headers={detailHeaders}
+                  data={attendanceDetails}
+                  fileName={`حضور_${selectedSession.courses?.name}`}
+                  disabled={attendanceDetails.length === 0}
+                />
+              </div>
             </div>
 
             <div style={{ marginTop: '1rem', maxHeight: '350px', overflowY: 'auto' }}>
